@@ -249,5 +249,41 @@ mod tests {
     fn test_single_sample() {
         let real_m = 2.0f32;
         let real_c = 5.0f32;
+
+        let n_points = 20;
+        let x_range = Range::new(0f32, 10f32);
+        let norm_range = Normal::new(0.0, 3.0);
+        let mut real_x: Vec<f32> = (0..n_points)
+            .map(|_| x_range.ind_sample(&mut rand::thread_rng()))
+            .collect();
+        real_x.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        let real_y: Vec<f32> = real_x.iter().map(|x| real_m * x + real_c).collect();
+        let observed_y: Vec<f32> = real_y
+            .iter()
+            .map(|y| y + norm_range.ind_sample(&mut rand::thread_rng()) as f32)
+            .collect();
+        let p0 = Guess {
+            values: vec![0.0f32, 0.0f32],
+        };
+
+        struct Foo;
+
+        impl Prob for Foo {
+            fn lnlike(&self, _params: &Guess) -> f32 {
+                0.0f32
+            }
+
+            fn lnprior(&self, _params: &Guess) -> f32 {
+                0.0f32
+            }
+        }
+
+        let nwalkers = 10;
+        let niters = 100;
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), Box::new(Foo));
+
+        let params = p0.create_initial_guess(nwalkers);
+        sampler.sample(&params, niters).unwrap();
     }
 }
