@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 extern crate rand;
 
 use std::error::Error;
@@ -12,17 +13,17 @@ pub enum EmceeError {
 type Result<T> = ::std::result::Result<T, EmceeError>;
 type GuessVector = Vec<Guess>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Guess {
     pub values: Vec<f32>,
 }
 
 impl Guess {
-    fn new(values: &[f32]) -> Self {
+    pub fn new(values: &[f32]) -> Self {
         Guess { values: Vec::from(values) }
     }
 
-    fn perturb(&self) -> Self {
+    pub fn perturb(&self) -> Self {
         let mut new_values = self.values.clone();
 
         let normal = Normal::new(0.0, 1E-5);
@@ -33,15 +34,15 @@ impl Guess {
         Guess { values: new_values }
     }
 
-    fn create_initial_guess(&self, nwalkers: usize) -> Vec<Self> {
+    pub fn create_initial_guess(&self, nwalkers: usize) -> Vec<Self> {
         (0..nwalkers).map(|_| self.perturb()).collect()
     }
 
-    fn contains_infs(&self) -> bool {
+    pub fn contains_infs(&self) -> bool {
         self.values.iter().any(|val| val.is_infinite())
     }
 
-    fn contains_nans(&self) -> bool {
+    pub fn contains_nans(&self) -> bool {
         self.values.iter().any(|val| val.is_nan())
     }
 }
@@ -64,7 +65,7 @@ pub trait Prob {
 
 #[derive(Debug, Default)]
 struct Stretch {
-    q: GuessVector,
+    q: Vec<Guess>,
     newlnprob: Vec<f32>,
     accept: Vec<bool>,
 }
@@ -74,7 +75,7 @@ pub struct EnsembleSampler {
     naccepted: usize,
     iterations: usize,
     lnprob: Box<Prob>,
-    chain: GuessVector,
+    chain: Vec<Guess>,
     dim: usize,
     last_run_mcmc_result: Option<i32>, // TODO: this is not i32
 }
@@ -92,16 +93,38 @@ impl EnsembleSampler {
         }
     }
 
-    pub fn sample(&mut self, params: &GuessVector, iterations: usize) -> Result<()> {
+    pub fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
+        let mut p = params.to_owned();
         let halfk = self.nwalkers / 2;
-        let initial_lnprob = self.get_lnprob(params)?;
-        let chain_len = self.chain.len();
-        for i in 0..iterations {
+        let mut lnprob = self.get_lnprob(params)?;
+        let indices: Vec<usize> = (0..params.len()).collect();
+
+        for _ in 0..iterations {
             self.iterations += 1;
             let (first_half, second_half) = params.split_at(halfk);
+            let (first_i, second_i) = indices.split_at(halfk);
             let to_iterate = &[(&first_half, &second_half), (&second_half, &first_half)];
-            for &(S0, S1) in to_iterate {
-                let stretch = self.propose_stretch(S0, S1, &initial_lnprob);
+            let i_iterate = &[(&first_i, &second_i), (&second_i, &first_i)];
+
+            let zipped = i_iterate.iter().zip(to_iterate);
+            for val in zipped {
+                let &(I0, _) = val.0;
+                let &(S0, S1) = val.1;
+
+                let stretch = self.propose_stretch(S0, S1, &lnprob);
+                if stretch.accept.iter().any(|val| *val) {
+                    /* Update the positions, log probabilities and acceptance counts */
+                    for j in 0..stretch.accept.len() {
+                        if !stretch.accept[j] {
+                            continue;
+                        }
+
+                        let idx = I0[j]; // position in the parameter vector
+                        lnprob[idx] = stretch.newlnprob[j];
+
+                        p[idx].values = stretch.q[j].values.clone()
+                    }
+                }
             }
         }
         Ok(())
@@ -117,11 +140,7 @@ impl EnsembleSampler {
 
     // Internal functions
 
-    fn propose_stretch(&mut self,
-                       p0: &[Guess],
-                       p1: &[Guess],
-                       lnprob0: &Vec<f32>)
-                       -> Stretch {
+    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &Vec<f32>) -> Stretch {
         let Ns = p0.len();
         let Nc = p1.len();
 
@@ -137,6 +156,7 @@ impl EnsembleSampler {
                      2.0f32
                  })
             .collect();
+
         for i in 0..Ns {
             let rint = rint_range.ind_sample(&mut rand::thread_rng());
             let ref s = p0[i].values;
@@ -147,6 +167,7 @@ impl EnsembleSampler {
                 let val = c[j] - zz[i] * (c[j] * s[j]);
                 new_guess.values.push(val);
             }
+            q.push(new_guess);
         }
 
         let mut out = Stretch::default();
@@ -157,6 +178,7 @@ impl EnsembleSampler {
         for i in 0..out.newlnprob.len() {
             let dim = p0[0].values.len();
             let lnpdiff = ((dim - 1) as f32) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
+
             if lnpdiff > unit_range.ind_sample(&mut rand::thread_rng()).ln() {
                 out.accept[i] = true;
             }
@@ -165,7 +187,7 @@ impl EnsembleSampler {
         out
     }
 
-    fn get_lnprob(&mut self, p: &GuessVector) -> Result<Vec<f32>> {
+    fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f32>> {
         let mut lnprobs = Vec::with_capacity(p.len());
         for guess in p {
             if guess.contains_infs() {
@@ -221,5 +243,11 @@ mod tests {
 
         let guess = Guess::new(&[0f32]);
         assert!(!guess.contains_nans());
+    }
+
+    #[test]
+    fn test_single_sample() {
+        let real_m = 2.0f32;
+        let real_c = 5.0f32;
     }
 }
