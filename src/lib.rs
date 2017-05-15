@@ -99,6 +99,10 @@ impl EnsembleSampler {
         for i in 0..iterations {
             self.iterations += 1;
             let (first_half, second_half) = params.split_at(halfk);
+            let to_iterate = &[(&first_half, &second_half), (&second_half, &first_half)];
+            for &(S0, S1) in to_iterate {
+                let stretch = self.propose_stretch(S0, S1, &initial_lnprob);
+            }
         }
         Ok(())
     }
@@ -114,8 +118,8 @@ impl EnsembleSampler {
     // Internal functions
 
     fn propose_stretch(&mut self,
-                       p0: &GuessVector,
-                       p1: &GuessVector,
+                       p0: &[Guess],
+                       p1: &[Guess],
                        lnprob0: &Vec<f32>)
                        -> Stretch {
         let Ns = p0.len();
