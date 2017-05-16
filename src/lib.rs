@@ -267,21 +267,37 @@ mod tests {
             values: vec![0.0f32, 0.0f32],
         };
 
-        struct Foo;
+        struct LinearModel<'a> {
+            x: &'a [f32],
+            y: &'a [f32],
+        }
 
-        impl Prob for Foo {
-            fn lnlike(&self, _params: &Guess) -> f32 {
-                0.0f32
-            }
-
-            fn lnprior(&self, _params: &Guess) -> f32 {
-                0.0f32
+        impl<'a> LinearModel<'a> {
+            fn new(x: &'a [f32], y: &'a [f32]) -> Self {
+                LinearModel { x, y }
             }
         }
 
+        impl<'a> Prob for LinearModel<'a> {
+            fn lnprior(&self, _params: &Guess) -> f32 {
+                0.0f32
+            }
+
+            fn lnlike(&self, params: &Guess) -> f32 {
+                let m = params.values[0];
+                let c = params.values[1];
+                let sum = self.x.iter()
+                    .zip(self.y)
+                    .fold(0.0f32, |acc, (x, y)| acc + (y - m * x + c).powf(2.0));
+                -sum
+            }
+        }
+
+        let foo = LinearModel::new(&real_x, &observed_y);
+
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), Box::new(Foo));
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.sample(&params, niters).unwrap();
