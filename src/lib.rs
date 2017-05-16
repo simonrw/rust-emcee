@@ -74,7 +74,6 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     naccepted: usize,
     iterations: usize,
     lnprob: &'a T,
-    chain: Vec<Guess>,
     dim: usize,
     last_run_mcmc_result: Option<i32>, // TODO: this is not i32
     rng: rand::ThreadRng,
@@ -88,7 +87,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             lnprob: lnprob,
             dim: dim,
             naccepted: 0,
-            chain: Vec::new(),
             last_run_mcmc_result: None,
             rng: rand::thread_rng(),
         }
@@ -132,7 +130,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         Ok(())
     }
 
-    pub fn run_mcmc(&mut self, p0: &[Guess], N: usize) {}
+    pub fn run_mcmc(&mut self, p0: &[Guess], N: usize) -> Result<()> {
+        self.sample(p0, N)
+    }
 
     pub fn reset(&mut self) {
         self.iterations = 0;
@@ -213,6 +213,36 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 mod tests {
     use super::*;
 
+    const REAL_M: f32 = 2.0f32;
+    const REAL_C: f32 = 5.0f32;
+
+    struct LinearModel<'a> {
+        x: &'a [f32],
+        y: &'a [f32],
+    }
+
+    impl<'a> LinearModel<'a> {
+        fn new(x: &'a [f32], y: &'a [f32]) -> Self {
+            LinearModel { x, y }
+        }
+    }
+
+    impl<'a> Prob for LinearModel<'a> {
+        fn lnprior(&self, _params: &Guess) -> f32 {
+            0.0f32
+        }
+
+        fn lnlike(&self, params: &Guess) -> f32 {
+            let m = params.values[0];
+            let c = params.values[1];
+            let sum = self.x.iter()
+                .zip(self.y)
+                .fold(0.0f32, |acc, (x, y)| acc + (y - m * x + c).powf(2.0));
+            -sum
+        }
+    }
+
+
     #[test]
     fn test_pertubation() {
         let guess = Guess::new(&[1.0f32, 2.0f32]);
@@ -248,59 +278,53 @@ mod tests {
 
     #[test]
     fn test_single_sample() {
-        let real_m = 2.0f32;
-        let real_c = 5.0f32;
-
-        let n_points = 20;
-        let x_range = Range::new(0f32, 10f32);
-        let norm_range = Normal::new(0.0, 3.0);
-        let mut real_x: Vec<f32> = (0..n_points)
-            .map(|_| x_range.ind_sample(&mut rand::thread_rng()))
-            .collect();
-        real_x.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        let real_y: Vec<f32> = real_x.iter().map(|x| real_m * x + real_c).collect();
-        let observed_y: Vec<f32> = real_y
-            .iter()
-            .map(|y| y + norm_range.ind_sample(&mut rand::thread_rng()) as f32)
-            .collect();
-        let p0 = Guess {
-            values: vec![0.0f32, 0.0f32],
-        };
-
-        struct LinearModel<'a> {
-            x: &'a [f32],
-            y: &'a [f32],
-        }
-
-        impl<'a> LinearModel<'a> {
-            fn new(x: &'a [f32], y: &'a [f32]) -> Self {
-                LinearModel { x, y }
-            }
-        }
-
-        impl<'a> Prob for LinearModel<'a> {
-            fn lnprior(&self, _params: &Guess) -> f32 {
-                0.0f32
-            }
-
-            fn lnlike(&self, params: &Guess) -> f32 {
-                let m = params.values[0];
-                let c = params.values[1];
-                let sum = self.x.iter()
-                    .zip(self.y)
-                    .fold(0.0f32, |acc, (x, y)| acc + (y - m * x + c).powf(2.0));
-                -sum
-            }
-        }
-
+        let (real_x, observed_y) = generate_dataset(20);
         let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
+
+        let nwalkers = 10;
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo);
+
+        let params = p0.create_initial_guess(nwalkers);
+        sampler.sample(&params, 1).unwrap();
+    }
+
+    #[test]
+    fn test_run_mcmc() {
+        let (real_x, observed_y) = generate_dataset(20);
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
 
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo);
 
         let params = p0.create_initial_guess(nwalkers);
-        sampler.sample(&params, niters).unwrap();
+        sampler.run_mcmc(&params, niters).unwrap();
+    }
+
+    // Test helper functions
+    fn create_guess() -> Guess {
+        Guess {
+            values: vec![0.0f32, 0.0f32],
+        }
+    }
+
+    fn generate_dataset(size: usize) -> (Vec<f32>, Vec<f32>) {
+        let mut rng = rand::thread_rng();
+        let x_range = Range::new(0f32, 10f32);
+        let norm_range = Normal::new(0.0, 3.0);
+
+        let mut real_x: Vec<f32> = (0..size)
+            .map(|_| x_range.ind_sample(&mut rng))
+            .collect();
+        real_x.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        let real_y: Vec<f32> = real_x.iter().map(|x| REAL_M * x + REAL_C).collect();
+        let observed_y: Vec<f32> = real_y
+            .iter()
+            .map(|y| y + norm_range.ind_sample(&mut rng) as f32)
+            .collect();
+        (real_x, observed_y)
     }
 }
