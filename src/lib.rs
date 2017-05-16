@@ -11,7 +11,6 @@ pub enum EmceeError {
 }
 
 type Result<T> = ::std::result::Result<T, EmceeError>;
-type GuessVector = Vec<Guess>;
 
 #[derive(Debug, Clone)]
 pub struct Guess {
@@ -28,7 +27,7 @@ impl Guess {
 
         let normal = Normal::new(0.0, 1E-5);
         for i in 0..new_values.len() {
-            new_values[i] = new_values[i] + normal.ind_sample(&mut rand::thread_rng()) as f32;
+            new_values[i] += normal.ind_sample(&mut rand::thread_rng()) as f32;
         }
 
         Guess { values: new_values }
@@ -114,6 +113,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 let stretch = self.propose_stretch(S0, S1, &lnprob);
                 if stretch.accept.iter().any(|val| *val) {
                     /* Update the positions, log probabilities and acceptance counts */
+                    assert_eq!(I0.len(), stretch.accept.len());
                     for j in 0..stretch.accept.len() {
                         if !stretch.accept[j] {
                             continue;
@@ -130,7 +130,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         Ok(())
     }
 
-    pub fn run_mcmc(&mut self, p0: &GuessVector, N: usize) {}
+    pub fn run_mcmc(&mut self, p0: &[Guess], N: usize) {}
 
     pub fn reset(&mut self) {
         self.iterations = 0;
@@ -140,7 +140,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
     // Internal functions
 
-    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &Vec<f32>) -> Stretch {
+    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f32]) -> Stretch {
         let Ns = p0.len();
         let Nc = p1.len();
 
@@ -159,8 +159,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
         for i in 0..Ns {
             let rint = rint_range.ind_sample(&mut rand::thread_rng());
-            let ref s = p0[i].values;
-            let ref c = p1[rint].values;
+            let s = &p0[i].values;
+            let c = &p1[rint].values;
+
+            assert!(c.len() >= Nc);
+            assert!(s.len() >= Nc);
 
             let mut new_guess = Guess { values: Vec::with_capacity(Nc) };
             for j in 0..Nc {
