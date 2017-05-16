@@ -151,28 +151,25 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let unit_range = Range::new(0f32, 1f32);
 
         let a = 2.0f32;
-        let mut q = Vec::new();
         let zz: Vec<f32> = (0..Ns)
             .map(|_| {
                      ((a - 1.0) * z_range.ind_sample(&mut self.rng)).powf(2.0f32) / 2.0f32
                  })
             .collect();
 
-        for i in 0..Ns {
-            let rint = rint_range.ind_sample(&mut rand::thread_rng());
-            let s = &p0[i].values;
-            let c = &p1[rint].values;
 
-            assert!(c.len() >= Nc);
-            assert!(s.len() >= Nc);
+        let rint: Vec<usize> = (0..Ns).map(|_| rint_range.ind_sample(&mut self.rng)).collect();
 
-            let mut new_guess = Guess { values: Vec::with_capacity(Nc) };
-            for j in 0..Nc {
-                let val = c[j] - zz[i] * (c[j] * s[j]);
-                new_guess.values.push(val);
+        let mut q = Vec::new();
+        for guess_i in 0..Ns {
+            let mut values = Vec::with_capacity(self.dim);
+            for param_i in 0..self.dim {
+                let new_value = p1[rint[guess_i]].values[param_i] - zz[guess_i] * (p1[rint[guess_i]].values[param_i] - p0[guess_i].values[param_i]);
+                values.push(new_value);
             }
-            q.push(new_guess);
+            q.push(Guess { values });
         }
+        assert_eq!(q.len(), zz.len());
 
         let mut out = Stretch::default();
         out.newlnprob = self.get_lnprob(&q).unwrap();
