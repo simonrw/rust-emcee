@@ -77,6 +77,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     chain: Vec<Guess>,
     dim: usize,
     last_run_mcmc_result: Option<i32>, // TODO: this is not i32
+    rng: rand::ThreadRng,
 }
 
 impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
@@ -89,6 +90,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             naccepted: 0,
             chain: Vec::new(),
             last_run_mcmc_result: None,
+            rng: rand::thread_rng(),
         }
     }
 
@@ -152,8 +154,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let mut q = Vec::new();
         let zz: Vec<f32> = (0..Ns)
             .map(|_| {
-                     ((a - 1.0) * z_range.ind_sample(&mut rand::thread_rng()) + 1.0).powf(2.0f32) /
-                     2.0f32
+                     ((a - 1.0) * z_range.ind_sample(&mut self.rng)).powf(2.0f32) / 2.0f32
                  })
             .collect();
 
@@ -182,7 +183,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             let dim = p0[0].values.len();
             let lnpdiff = ((dim - 1) as f32) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
 
-            if lnpdiff > unit_range.ind_sample(&mut rand::thread_rng()).ln() {
+            if lnpdiff > unit_range.ind_sample(&mut self.rng).ln() {
                 out.accept[i] = true;
             }
         }
