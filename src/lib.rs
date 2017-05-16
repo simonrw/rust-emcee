@@ -70,18 +70,18 @@ struct Stretch {
     accept: Vec<bool>,
 }
 
-pub struct EnsembleSampler {
+pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
     naccepted: usize,
     iterations: usize,
-    lnprob: Box<Prob>,
+    lnprob: &'a T,
     chain: Vec<Guess>,
     dim: usize,
     last_run_mcmc_result: Option<i32>, // TODO: this is not i32
 }
 
-impl EnsembleSampler {
-    pub fn new(nwalkers: usize, dim: usize, lnprob: Box<Prob>) -> Self {
+impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
+    pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Self {
         EnsembleSampler {
             nwalkers: nwalkers,
             iterations: 0,
