@@ -1,0 +1,3 @@
+[submodule "emcee-src"]
+	path = emcee-src
+	url = https://github.com/dfm/emcee.git
