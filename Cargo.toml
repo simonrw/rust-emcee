@@ -1,7 +1,10 @@
 [package]
+authors = ["Simon Walker <s.r.walker101@googlemail.com>"]
 name = "emcee"
 version = "0.1.0"
-authors = ["Simon Walker <s.r.walker101@googlemail.com>"]
 
 [dependencies]
 rand = "0.3.15"
+
+[dev-dependencies]
+assert_approx_eq = "1.0.0"

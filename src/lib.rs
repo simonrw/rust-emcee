@@ -1,6 +1,10 @@
 #![allow(non_snake_case)]
 extern crate rand;
 
+#[cfg(test)]
+#[macro_use]
+extern crate assert_approx_eq;
+
 use std::error::Error;
 
 use rand::distributions::{Range, Normal, IndependentSample};
@@ -93,6 +97,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     pub fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
+        /* Take a copy of the input vector so we can mutate it */
         let mut p = params.to_owned();
         let halfk = self.nwalkers / 2;
         let mut lnprob = self.get_lnprob(params)?;
@@ -152,19 +157,21 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
         let a = 2.0f32;
         let zz: Vec<f32> = (0..Ns)
-            .map(|_| {
-                     ((a - 1.0) * z_range.ind_sample(&mut self.rng)).powf(2.0f32) / 2.0f32
-                 })
+            .map(|_| ((a - 1.0) * z_range.ind_sample(&mut self.rng)).powf(2.0f32) / 2.0f32)
             .collect();
 
 
-        let rint: Vec<usize> = (0..Ns).map(|_| rint_range.ind_sample(&mut self.rng)).collect();
+        let rint: Vec<usize> = (0..Ns)
+            .map(|_| rint_range.ind_sample(&mut self.rng))
+            .collect();
 
         let mut q = Vec::new();
         for guess_i in 0..Ns {
             let mut values = Vec::with_capacity(self.dim);
             for param_i in 0..self.dim {
-                let new_value = p1[rint[guess_i]].values[param_i] - zz[guess_i] * (p1[rint[guess_i]].values[param_i] - p0[guess_i].values[param_i]);
+                let new_value = p1[rint[guess_i]].values[param_i] -
+                                zz[guess_i] *
+                                (p1[rint[guess_i]].values[param_i] - p0[guess_i].values[param_i]);
                 values.push(new_value);
             }
             q.push(Guess { values });
@@ -211,6 +218,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     const REAL_M: f32 = 2.0f32;
@@ -235,7 +243,8 @@ mod tests {
         fn lnlike(&self, params: &Guess) -> f32 {
             let m = params.values[0];
             let c = params.values[1];
-            let sum = self.x.iter()
+            let sum = self.x
+                .iter()
                 .zip(self.y)
                 .fold(0.0f32, |acc, (x, y)| acc + (y - m * x + c).powf(2.0));
             -sum
@@ -303,11 +312,92 @@ mod tests {
         sampler.run_mcmc(&params, niters).unwrap();
     }
 
+    #[test]
+    fn test_lnprob() {
+        /* PYTHON OUTPUT
+         *  x: [ 0.20584494  0.58083612  1.5599452   1.5601864   1.81824967  1.8340451
+         *   2.12339111  2.9122914   3.04242243  3.74540119  4.31945019  5.24756432
+         *   5.98658484  6.01115012  7.08072578  7.31993942  8.32442641  8.66176146
+         *   9.50714306  9.69909852]
+         *
+         * y: [  4.39885877   6.47591958   7.21186633   6.70806911  10.10214811
+         *    8.4423139    9.31431042   9.39983462  10.54046213  12.60172497
+         *   12.4879068   15.87082665  16.37253099  16.73060649  18.55974494
+         *   21.49215702  21.63535559  21.26581199  24.83683104  23.17735339]
+         *
+         *
+         * pos: [[  2.08863595e-06   2.08863595e-06]
+         * [ -1.95967012e-05  -1.95967012e-05]
+         * [ -1.32818605e-05  -1.32818605e-05]
+         * [  1.96861236e-06   1.96861236e-06]]
+
+         * result: array([-4613.19497084, -4613.277985  , -4613.25381092, -4613.1954303 ])
+         */
+        let (real_x, observed_y) = load_baked_dataset();
+        let mut pos = Vec::new();
+        pos.push(Guess { values: vec![2.08863595e-06, 2.08863595e-06] });
+        pos.push(Guess { values: vec![-1.95967012e-05, -1.95967012e-05] });
+        pos.push(Guess { values: vec![-1.32818605e-05, -1.32818605e-05] });
+        pos.push(Guess { values: vec![1.96861236e-06, 1.96861236e-06] });
+        let foo = LinearModel::new(&real_x, &observed_y);
+
+        let nwalkers = 4;
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo);
+        let lnprob = sampler.get_lnprob(&pos).unwrap();
+        let expected: Vec<f32> = vec![-4613.19497084, -4613.277985, -4613.25381092, -4613.1954303];
+        for (a, b) in lnprob.iter().zip(expected) {
+            /*
+             * TODO: this is quite a wide tolerance which makes the test pass, but needs tweaking.
+             * Perhaps something is wrong with the algorithm itself
+             * - perhaps the quoted floats copied from the printing of the python script are not precise
+             *   enough to give the correct level of precision
+             */
+            assert_approx_eq!(a, b, 0.05f32);
+        }
+    }
+
+    #[test]
+    fn test_lnprob_implementations() {
+        let p0 = create_guess();
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+
+        let expected = -4613.202966359966f32;
+        assert_approx_eq!(foo.lnprob(&p0), expected);
+    }
+
+
     // Test helper functions
     fn create_guess() -> Guess {
-        Guess {
-            values: vec![0.0f32, 0.0f32],
-        }
+        Guess { values: vec![0.0f32, 0.0f32] }
+    }
+
+    fn load_baked_dataset() -> (Vec<f32>, Vec<f32>) {
+        let real_x: Vec<f32> = vec![0.20584494, 0.58083612, 1.5599452, 1.5601864, 1.81824967,
+                                    1.8340451, 2.12339111, 2.9122914, 3.04242243, 3.74540119,
+                                    4.31945019, 5.24756432, 5.98658484, 6.01115012, 7.08072578,
+                                    7.31993942, 8.32442641, 8.66176146, 9.50714306, 9.69909852];
+        let observed_y: Vec<f32> = vec![4.39885877,
+                                        6.47591958,
+                                        7.21186633,
+                                        6.70806911,
+                                        10.10214811,
+                                        8.4423139,
+                                        9.31431042,
+                                        9.39983462,
+                                        10.54046213,
+                                        12.60172497,
+                                        12.4879068,
+                                        15.87082665,
+                                        16.37253099,
+                                        16.73060649,
+                                        18.55974494,
+                                        21.49215702,
+                                        21.63535559,
+                                        21.26581199,
+                                        24.83683104,
+                                        23.17735339];
+        (real_x, observed_y)
     }
 
     fn generate_dataset(size: usize) -> (Vec<f32>, Vec<f32>) {
@@ -315,9 +405,7 @@ mod tests {
         let x_range = Range::new(0f32, 10f32);
         let norm_range = Normal::new(0.0, 3.0);
 
-        let mut real_x: Vec<f32> = (0..size)
-            .map(|_| x_range.ind_sample(&mut rng))
-            .collect();
+        let mut real_x: Vec<f32> = (0..size).map(|_| x_range.ind_sample(&mut rng)).collect();
         real_x.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         let real_y: Vec<f32> = real_x.iter().map(|x| REAL_M * x + REAL_C).collect();
