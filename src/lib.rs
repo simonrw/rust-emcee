@@ -113,10 +113,9 @@ impl Chain {
 
     pub fn set_params(&mut self, walker_idx: usize, iteration_idx: usize, newdata: &[f32]) {
         assert_eq!(newdata.len(), self.nparams);
-        for (idx, value) in newdata.iter()
-            .enumerate() {
-                self.set(idx, walker_idx, iteration_idx, *value);
-            }
+        for (idx, value) in newdata.iter().enumerate() {
+            self.set(idx, walker_idx, iteration_idx, *value);
+        }
     }
 
     fn index(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> usize {
@@ -190,7 +189,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 match self.chain {
                     Some(ref mut chain) => {
                         chain.set_params(idx, self.iterations, &guess.values);
-                    },
+                    }
                     None => unreachable!(),
                 }
             }
@@ -440,7 +439,8 @@ mod tests {
             /*
              * TODO: this is quite a wide tolerance which makes the test pass, but needs tweaking.
              * Perhaps something is wrong with the algorithm itself
-             * - perhaps the quoted floats copied from the printing of the python script are not precise
+             * - perhaps the quoted floats copied from the printing of the python script are not
+             *   precise
              *   enough to give the correct level of precision
              */
             assert_approx_eq!(a, b, 0.05f32);
@@ -460,9 +460,7 @@ mod tests {
     #[test]
     fn test_propose_stretch() {
         let nwalkers = 100;
-        let p0 = Guess {
-            values: vec![2.0f32, 5.0f32],
-        };
+        let p0 = Guess { values: vec![2.0f32, 5.0f32] };
 
         let pos = p0.create_initial_guess(nwalkers);
         let (real_x, observed_y) = load_baked_dataset();
@@ -481,9 +479,7 @@ mod tests {
     #[test]
     fn test_mcmc_run() {
         let nwalkers = 20;
-        let p0 = Guess {
-            values: vec![0f32, 0f32],
-        };
+        let p0 = Guess { values: vec![0f32, 0f32] };
         let pos = p0.create_initial_guess(nwalkers);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
