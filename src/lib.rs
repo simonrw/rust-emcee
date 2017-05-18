@@ -123,6 +123,52 @@ impl Chain {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ProbStore {
+    data: Vec<f32>,
+    nwalkers: usize,
+    niterations: usize,
+}
+
+impl ProbStore {
+    pub fn new(nwalkers: usize, niterations: usize) -> ProbStore {
+        ProbStore {
+            nwalkers: nwalkers,
+            niterations: niterations,
+            data: vec![0f32; nwalkers * niterations],
+        }
+    }
+
+    pub fn set(&mut self, walker_idx: usize, iteration_idx: usize, value: f32) {
+        assert!(walker_idx < self.nwalkers);
+        assert!(iteration_idx < self.niterations);
+
+        let idx = self.index(walker_idx, iteration_idx);
+
+        self.data[idx] = value;
+    }
+
+    pub fn get(&mut self, walker_idx: usize, iteration_idx: usize) -> f32 {
+        assert!(walker_idx < self.nwalkers);
+        assert!(iteration_idx < self.niterations);
+
+        let idx = self.index(walker_idx, iteration_idx);
+
+        self.data[idx]
+    }
+
+    pub fn set_probs(&mut self, iteration_idx: usize, newdata: &[f32]) {
+        assert_eq!(newdata.len(), self.nwalkers);
+        for (idx, value) in newdata.iter().enumerate() {
+            self.set(idx, iteration_idx, *value);
+        }
+    }
+
+    fn index(&self, walker_idx: usize, iteration_idx: usize) -> usize {
+        (iteration_idx * self.nwalkers) + walker_idx
+    }
+}
+
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
     naccepted: usize,
@@ -372,6 +418,30 @@ mod tests {
 
         assert_eq!(chain.get(0, 1, 250), 5.0f32);
         assert_eq!(chain.get(1, 1, 250), 100.0f32);
+    }
+
+    #[test]
+    fn test_probstore() {
+        let nwalkers = 4;
+        let niterations = 1000;
+        let mut store = ProbStore::new(nwalkers, niterations);
+        assert_eq!(store.data.len(), nwalkers * niterations);
+
+        assert_eq!(store.index(0, 0), 0);
+        assert_eq!(store.index(2, 0), 2);
+        assert_eq!(store.index(0, 1), 4);
+
+        store.set(1, 0, 2.0f32);
+        assert_eq!(store.data[1], 2.0f32);
+        assert_eq!(store.get(1, 0), 2.0f32);
+
+
+        let newdata = vec![5.0f32, 100.0f32, 1.0f32, 20f32];
+        store.set_probs(250, &newdata);
+
+        assert_eq!(store.get(0, 250), 5.0f32);
+        assert_eq!(store.get(1, 250), 100.0f32);
+        assert_eq!(store.get(3, 250), 20.0f32);
     }
 
 
