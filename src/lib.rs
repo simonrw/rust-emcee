@@ -177,6 +177,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     dim: usize,
     rng: rand::ThreadRng,
     chain: Option<Chain>,
+    probstore: Option<ProbStore>,
 }
 
 impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
@@ -189,6 +190,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             naccepted: 0,
             rng: rand::thread_rng(),
             chain: None,
+            probstore: None,
         }
     }
 
@@ -199,6 +201,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let mut lnprob = self.get_lnprob(params)?;
         let indices: Vec<usize> = (0..params.len()).collect();
         self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
+        self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
 
         for iter in 0..iterations {
             self.iterations = iter;;
@@ -238,6 +241,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                     }
                     None => unreachable!(),
                 }
+            }
+
+            match self.probstore {
+                Some(ref mut store) => {
+                    store.set_probs(self.iterations, &lnprob);
+                }
+                None => unreachable!(),
             }
         }
         Ok(())
