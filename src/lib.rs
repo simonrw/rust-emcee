@@ -124,6 +124,20 @@ impl Chain {
         }
     }
 
+    pub fn flatchain(&self) -> Vec<Guess> {
+        let mut out = Vec::with_capacity(self.niterations * self.nwalkers);
+        let mut buffer = vec![0f32; self.nparams];
+        for iter in 0..self.niterations {
+            for walker in 0..self.nwalkers {
+                for i in 0..self.nparams {
+                    buffer[i] = self.get(i, walker, iter);
+                    out.push(Guess { values: buffer.clone() });
+                }
+            }
+        }
+        out
+    }
+
     fn index(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> usize {
         (iteration_idx * self.nwalkers * self.nparams) + (walker_idx * self.nparams) + param_idx
     }
@@ -271,6 +285,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     pub fn reset(&mut self) {
         self.iterations = 0;
         self.naccepted = 0;
+    }
+
+    pub fn flatchain(&self) -> Vec<Guess> {
+        match self.chain {
+            Some(ref chain) => chain.flatchain(),
+            None => unreachable!(),
+        }
     }
 
     // Internal functions

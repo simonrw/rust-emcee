@@ -7,6 +7,8 @@
 extern crate emcee;
 extern crate rand;
 
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use rand::distributions::{Range, Normal, IndependentSample};
 
 fn main() {
@@ -24,7 +26,9 @@ fn main() {
     // Generate some synthetic data from the model.
     let npoints = 50usize;
     let x = {
-        let mut unsorted: Vec<_> = (0..npoints).map(|_| 10f32 * unit_range.ind_sample(&mut rng)).collect();
+        let mut unsorted: Vec<_> = (0..npoints)
+            .map(|_| 10f32 * unit_range.ind_sample(&mut rng))
+            .collect();
         unsorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
         unsorted
     };
@@ -41,7 +45,7 @@ fn main() {
         yerr.push(yerr_val);
     }
 
-    /* 
+    /*
      * Shortcut the least squares minimisation by starting the sampling
      * from the values found in the documentation
      */
@@ -107,4 +111,18 @@ fn main() {
 
     let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model);
     let _ = sampler.run_mcmc(&pos, 500).unwrap();
+
+    let flatchain = sampler.flatchain();
+
+    let file = File::create("/tmp/emcee-results.txt").expect("opening output file");
+    let mut writer = BufWriter::new(&file);
+
+    for guess in flatchain {
+        write!(&mut writer,
+               "{} {} {}\n",
+               guess.values[0],
+               guess.values[1],
+               guess.values[2])
+                .expect("writing output line");
+    }
 }
