@@ -50,8 +50,6 @@ impl Guess {
     }
 }
 
-pub struct RunResult {}
-
 pub trait Prob {
     fn lnlike(&self, params: &Guess) -> f32;
     fn lnprior(&self, params: &Guess) -> f32;
@@ -71,6 +69,14 @@ struct Stretch {
     q: Vec<Guess>,
     newlnprob: Vec<f32>,
     accept: Vec<bool>,
+}
+
+impl Stretch {
+    pub fn preallocated_accept(N: usize) -> Stretch {
+        let mut s = Stretch::default();
+        s.accept.resize(N, false);
+        s
+    }
 }
 
 #[derive(Debug, Default)]
@@ -101,7 +107,7 @@ impl Chain {
         self.data[idx] = value;
     }
 
-    pub fn get(&mut self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> f32 {
+    pub fn get(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> f32 {
         assert!(param_idx < self.nparams);
         assert!(walker_idx < self.nwalkers);
         assert!(iteration_idx < self.niterations);
@@ -148,7 +154,7 @@ impl ProbStore {
         self.data[idx] = value;
     }
 
-    pub fn get(&mut self, walker_idx: usize, iteration_idx: usize) -> f32 {
+    pub fn get(&self, walker_idx: usize, iteration_idx: usize) -> f32 {
         assert!(walker_idx < self.nwalkers);
         assert!(iteration_idx < self.niterations);
 
@@ -195,17 +201,20 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     pub fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
-        /* Take a copy of the input vector so we can mutate it */
-        let mut p = params.to_owned();
         let halfk = self.nwalkers / 2;
+
+        /* Loop state */
+        let mut p = params.to_owned(); // Take a copy of the input vector so we can mutate it
         let mut lnprob = self.get_lnprob(params)?;
+
         let indices: Vec<usize> = (0..params.len()).collect();
         self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
         self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
 
         for iter in 0..iterations {
             self.iterations = iter;;
-            let (first_half, second_half) = params.split_at(halfk);
+            let cloned = p.clone();
+            let (first_half, second_half) = cloned.split_at(halfk);
             let (first_i, second_i) = indices.split_at(halfk);
             let to_iterate = &[(&first_half, &second_half), (&second_half, &first_half)];
             let i_iterate = &[(&first_i, &second_i), (&second_i, &first_i)];
@@ -216,6 +225,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 let &(S0, S1) = val.1;
 
                 let stretch = self.propose_stretch(S0, S1, &lnprob);
+
                 if stretch.accept.iter().any(|val| *val) {
                     /* Update the positions, log probabilities and acceptance counts */
                     assert_eq!(I0.len(), stretch.accept.len());
@@ -225,6 +235,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                         }
 
                         let idx = I0[j]; // position in the parameter vector
+                        assert!(idx < lnprob.len());
                         lnprob[idx] = stretch.newlnprob[j];
 
                         let new_values = stretch.q[j].values.clone();
@@ -277,7 +288,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             .map(|_| ((a - 1.0) * z_range.ind_sample(&mut self.rng)).powf(2.0f32) / 2.0f32)
             .collect();
 
-
         let rint: Vec<usize> = (0..Ns)
             .map(|_| rint_range.ind_sample(&mut self.rng))
             .collect();
@@ -286,24 +296,22 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         for guess_i in 0..Ns {
             let mut values = Vec::with_capacity(self.dim);
             for param_i in 0..self.dim {
-                let new_value = p1[rint[guess_i]].values[param_i] -
-                                zz[guess_i] *
-                                (p1[rint[guess_i]].values[param_i] - p0[guess_i].values[param_i]);
+                let guess_diff = p1[rint[guess_i]].values[param_i] - p0[guess_i].values[param_i];
+
+                let new_value = p1[rint[guess_i]].values[param_i] - zz[guess_i] * guess_diff;
                 values.push(new_value);
             }
             q.push(Guess { values });
         }
         assert_eq!(q.len(), zz.len());
 
-        let mut out = Stretch::default();
+        let mut out = Stretch::preallocated_accept(Ns);
         out.newlnprob = self.get_lnprob(&q).unwrap();
         out.q = q;
-        out.accept.resize(out.newlnprob.len(), false);
 
-        for i in 0..out.newlnprob.len() {
+        for i in 0..Ns {
             let dim = p0[0].values.len();
             let lnpdiff = ((dim - 1) as f32) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
-
             if lnpdiff > unit_range.ind_sample(&mut self.rng).ln() {
                 out.accept[i] = true;
             }
@@ -363,7 +371,11 @@ mod tests {
             let sum = self.x
                 .iter()
                 .zip(self.y)
-                .fold(0.0f32, |acc, (x, y)| acc + (y - m * x + c).powf(2.0));
+                .fold(0.0f32, |acc, (x, y)| {
+                    let model_value = m * x + c;
+                    let residual = y - model_value;
+                    acc + residual.powf(2.0)
+                });
             -sum
         }
     }
@@ -567,6 +579,15 @@ mod tests {
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
+
+        /*
+         * These are really tricky to test for. Random numbers are a pain to test.
+         * We therefore have a quite wide margin and hope that these tests are _vaguely_ reliable.
+         */
+        if let Some(ref chain) = sampler.chain {
+            assert_approx_eq!(chain.get(0, 0, niters - 1), 2.0f32, 3f32);
+            assert_approx_eq!(chain.get(1, 0, niters - 1), 5.0f32, 3f32);
+        }
     }
 
     // Test helper functions
