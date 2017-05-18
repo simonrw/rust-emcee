@@ -73,14 +73,65 @@ struct Stretch {
     accept: Vec<bool>,
 }
 
+#[derive(Debug, Default)]
+pub struct Chain {
+    data: Vec<f32>,
+    nparams: usize,
+    nwalkers: usize,
+    niterations: usize,
+}
+
+impl Chain {
+    pub fn new(nparams: usize, nwalkers: usize, niterations: usize) -> Chain {
+        Chain {
+            nparams: nparams,
+            nwalkers: nwalkers,
+            niterations: niterations,
+            data: vec![0f32; nparams * nwalkers * niterations],
+        }
+    }
+
+    pub fn set(&mut self, param_idx: usize, walker_idx: usize, iteration_idx: usize, value: f32) {
+        assert!(param_idx < self.nparams);
+        assert!(walker_idx < self.nwalkers);
+        assert!(iteration_idx < self.niterations);
+
+        let idx = self.index(param_idx, walker_idx, iteration_idx);
+
+        self.data[idx] = value;
+    }
+
+    pub fn get(&mut self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> f32 {
+        assert!(param_idx < self.nparams);
+        assert!(walker_idx < self.nwalkers);
+        assert!(iteration_idx < self.niterations);
+
+        let idx = self.index(param_idx, walker_idx, iteration_idx);
+
+        self.data[idx]
+    }
+
+    pub fn set_params(&mut self, walker_idx: usize, iteration_idx: usize, newdata: &[f32]) {
+        assert_eq!(newdata.len(), self.nparams);
+        for (idx, value) in newdata.iter()
+            .enumerate() {
+                self.set(idx, walker_idx, iteration_idx, *value);
+            }
+    }
+
+    fn index(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> usize {
+        (iteration_idx * self.nwalkers * self.nparams) + (walker_idx * self.nparams) + param_idx
+    }
+}
+
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
     naccepted: usize,
     iterations: usize,
     lnprob: &'a T,
     dim: usize,
-    last_run_mcmc_result: Option<i32>, // TODO: this is not i32
     rng: rand::ThreadRng,
+    chain: Option<Chain>,
 }
 
 impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
@@ -91,8 +142,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             lnprob: lnprob,
             dim: dim,
             naccepted: 0,
-            last_run_mcmc_result: None,
             rng: rand::thread_rng(),
+            chain: None,
         }
     }
 
@@ -102,9 +153,10 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let halfk = self.nwalkers / 2;
         let mut lnprob = self.get_lnprob(params)?;
         let indices: Vec<usize> = (0..params.len()).collect();
+        self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
 
-        for _ in 0..iterations {
-            self.iterations += 1;
+        for iter in 0..iterations {
+            self.iterations = iter;;
             let (first_half, second_half) = params.split_at(halfk);
             let (first_i, second_i) = indices.split_at(halfk);
             let to_iterate = &[(&first_half, &second_half), (&second_half, &first_half)];
@@ -127,8 +179,19 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                         let idx = I0[j]; // position in the parameter vector
                         lnprob[idx] = stretch.newlnprob[j];
 
-                        p[idx].values = stretch.q[j].values.clone()
+                        let new_values = stretch.q[j].values.clone();
+                        p[idx].values = new_values;
                     }
+                }
+            }
+
+            // Update the internal chain object
+            for (idx, guess) in p.iter().enumerate() {
+                match self.chain {
+                    Some(ref mut chain) => {
+                        chain.set_params(idx, self.iterations, &guess.values);
+                    },
+                    None => unreachable!(),
                 }
             }
         }
@@ -142,7 +205,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     pub fn reset(&mut self) {
         self.iterations = 0;
         self.naccepted = 0;
-        self.last_run_mcmc_result = None;
     }
 
     // Internal functions
@@ -286,6 +348,35 @@ mod tests {
     }
 
     #[test]
+    fn test_chain() {
+        let nparams = 2;
+        let nwalkers = 10;
+        let niterations = 1000;
+        let mut chain = Chain::new(nparams, nwalkers, niterations);
+        assert_eq!(chain.data.len(), nparams * nwalkers * niterations);
+
+        assert_eq!(chain.index(0, 0, 0), 0);
+        assert_eq!(chain.index(1, 0, 0), 1);
+        assert_eq!(chain.index(0, 1, 0), 2);
+        assert_eq!(chain.index(1, 1, 0), 3);
+        assert_eq!(chain.index(0, 2, 0), 4);
+        assert_eq!(chain.index(0, 9, 0), 18);
+        assert_eq!(chain.index(0, 0, 1), 20);
+
+        chain.set(0, 1, 0, 2.0f32);
+        assert_eq!(chain.data[2], 2.0f32);
+        assert_eq!(chain.get(0, 1, 0), 2.0f32);
+
+
+        let newdata = vec![5.0f32, 100.0f32];
+        chain.set_params(1, 250, &newdata);
+
+        assert_eq!(chain.get(0, 1, 250), 5.0f32);
+        assert_eq!(chain.get(1, 1, 250), 100.0f32);
+    }
+
+
+    #[test]
     fn test_single_sample() {
         let (real_x, observed_y) = generate_dataset(20);
         let foo = LinearModel::new(&real_x, &observed_y);
@@ -366,6 +457,41 @@ mod tests {
         assert_approx_eq!(foo.lnprob(&p0), expected);
     }
 
+    #[test]
+    fn test_propose_stretch() {
+        let nwalkers = 100;
+        let p0 = Guess {
+            values: vec![2.0f32, 5.0f32],
+        };
+
+        let pos = p0.create_initial_guess(nwalkers);
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
+        let (a, b) = pos.split_at(nwalkers / 2);
+
+        assert_eq!(a.len(), nwalkers / 2);
+        assert_eq!(b.len(), nwalkers / 2);
+
+        let lnprob = sampler.get_lnprob(&pos).unwrap();
+        let stretch = sampler.propose_stretch(&a, &b, &lnprob);
+    }
+
+    #[test]
+    fn test_mcmc_run() {
+        let nwalkers = 20;
+        let p0 = Guess {
+            values: vec![0f32, 0f32],
+        };
+        let pos = p0.create_initial_guess(nwalkers);
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+
+        let niters = 1000;
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
+        let _ = sampler.run_mcmc(&pos, niters).unwrap();
+    }
 
     // Test helper functions
     fn create_guess() -> Guess {

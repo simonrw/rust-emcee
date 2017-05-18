@@ -2,6 +2,7 @@
 
 
 import numpy as np
+np.random.seed(42)
 import emcee
 
 
@@ -37,3 +38,5 @@ if __name__ == '__main__':
     pos = np.array([p0 + 1E-5 * np.random.randn()
                     for _ in range(nwalkers)])
     sampler.run_mcmc(pos, niters)
+
+    print(sampler.flatchain[::10, 0])
