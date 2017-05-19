@@ -59,7 +59,7 @@ pub trait Prob {
         if lnp.is_finite() {
             lnp + self.lnlike(params)
         } else {
-            std::f32::INFINITY
+            -std::f32::INFINITY
         }
     }
 }
