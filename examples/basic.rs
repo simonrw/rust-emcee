@@ -117,7 +117,11 @@ fn main() {
     let file = File::create("/tmp/emcee-results.txt").expect("opening output file");
     let mut writer = BufWriter::new(&file);
 
-    for guess in flatchain {
+    for (i, guess) in flatchain.iter().enumerate() {
+        if i < 50 * nwalkers {
+            continue;
+        }
+
         write!(&mut writer,
                "{} {} {}\n",
                guess.values[0],
