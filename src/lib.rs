@@ -7,6 +7,7 @@ extern crate assert_approx_eq;
 
 use std::error::Error;
 
+use rand::{StdRng, Rng, SeedableRng};
 use rand::distributions::{Range, Normal, IndependentSample};
 
 #[derive(Debug)]
@@ -26,7 +27,7 @@ impl Guess {
         Guess { values: Vec::from(values) }
     }
 
-    pub fn perturb(&self) -> Self {
+    pub fn perturb(&self) -> Guess {
         let mut new_values = self.values.clone();
 
         let normal = Normal::new(0.0, 1E-5);
@@ -37,8 +38,28 @@ impl Guess {
         Guess { values: new_values }
     }
 
-    pub fn create_initial_guess(&self, nwalkers: usize) -> Vec<Self> {
+    pub fn perturb_with_rng<T: Rng>(&self, mut rng: &mut T) -> Guess {
+        let mut new_values = self.values.clone();
+
+        let normal = Normal::new(0.0, 1E-5);
+        for elem in &mut new_values {
+            *elem += normal.ind_sample(&mut rng) as f32;
+        }
+
+        Guess { values: new_values }
+    }
+
+    pub fn create_initial_guess(&self, nwalkers: usize) -> Vec<Guess> {
         (0..nwalkers).map(|_| self.perturb()).collect()
+    }
+
+    pub fn create_initial_guess_with_rng<T: Rng>(&self,
+                                                 nwalkers: usize,
+                                                 mut rng: &mut T)
+                                                 -> Vec<Guess> {
+        (0..nwalkers)
+            .map(|_| self.perturb_with_rng(&mut rng))
+            .collect()
     }
 
     pub fn contains_infs(&self) -> bool {
@@ -195,7 +216,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     iterations: usize,
     lnprob: &'a T,
     dim: usize,
-    rng: rand::ThreadRng,
+    rng: Box<Rng>,
     chain: Option<Chain>,
     probstore: Option<ProbStore>,
 }
@@ -208,10 +229,14 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             lnprob: lnprob,
             dim: dim,
             naccepted: 0,
-            rng: rand::thread_rng(),
+            rng: Box::new(rand::thread_rng()),
             chain: None,
             probstore: None,
         }
+    }
+
+    pub fn seed(&mut self, seed: &[usize]) {
+        self.rng = Box::new(StdRng::from_seed(seed));
     }
 
     pub fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
@@ -593,21 +618,20 @@ mod tests {
     fn test_mcmc_run() {
         let nwalkers = 20;
         let p0 = Guess { values: vec![0f32, 0f32] };
-        let pos = p0.create_initial_guess(nwalkers);
+        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
+        sampler.seed(&[1]);
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
 
-        /*
-         * These are really tricky to test for. Random numbers are a pain to test.
-         * We therefore have a quite wide margin and hope that these tests are _vaguely_ reliable.
-         */
         if let Some(ref chain) = sampler.chain {
-            assert_approx_eq!(chain.get(0, 0, niters - 1), 2.0f32, 3f32);
-            assert_approx_eq!(chain.get(1, 0, niters - 1), 5.0f32, 3f32);
+            /* Wide margins due to random numbers :( */
+            assert_approx_eq!(chain.get(0, 0, niters - 2), 2.0f32, 0.03f32);
+            assert_approx_eq!(chain.get(1, 0, niters - 2), 5.0f32, 0.4f32);
         }
     }
 
