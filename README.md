@@ -1,5 +1,7 @@
 # emcee
 
+[![Build Status](https://travis-ci.org/mindriot101/rust-emcee.svg?branch=master)](https://travis-ci.org/mindriot101/rust-emcee)
+
 A re-implementation of [emcee][1] in Rust.
 
 See the [hosted documentation here][2]
