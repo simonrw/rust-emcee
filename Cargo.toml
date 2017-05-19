@@ -8,6 +8,7 @@ repository = "https://github.com/mindriot101/rust-emcee"
 readme = "README.md"
 license = "MIT"
 documentation = "https://docs.rs/emcee"
+exclude = ["emcee-src", "python-tests"]
 categories = ["science"]
 
 [dependencies]
@@ -15,3 +16,6 @@ rand = "0.3.15"
 
 [dev-dependencies]
 assert_approx_eq = "1.0.0"
+
+[badges]
+travis-ci = { repository = "https://github.com/mindriot101/rust-emcee" }
