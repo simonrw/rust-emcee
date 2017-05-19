@@ -74,7 +74,7 @@ fn main() {
             let lnf = theta.values[2];
 
             let mut result = 0.;
-            for i in 9..self.x.len() {
+            for i in 0..self.x.len() {
                 let model = m * self.x[i] + b;
                 let inv_sigma2 = 1.0 / (self.e[i].powf(2.0) + model.powf(2.0) * (2.0 * lnf).exp());
                 result += (self.y[i] - model).powf(2.) * inv_sigma2 - inv_sigma2.ln();
