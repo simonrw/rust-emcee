@@ -4,7 +4,7 @@ use rand::distributions::{Normal, IndependentSample};
 /// Represents an initial guess
 ///
 /// This is the starting position for the sampling. All values are 32-bit floating point
-/// numbers, and are contained in a `Vec`.
+/// numbers, and are contained in a [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html).
 #[derive(Debug, Clone)]
 pub struct Guess {
     pub values: Vec<f32>,
@@ -27,7 +27,8 @@ impl Guess {
     /// Create a guess vector with custom random number generator
     ///
     /// For example, providing a random number generator that has been seeded causes re-creatable
-    /// results. The random number generator must come from the `rand` crate.
+    /// results. The random number generator must come from the [`rand`](https://docs.rs/rand)
+    /// crate.
     pub fn create_initial_guess_with_rng<T: Rng>(&self,
                                                  nwalkers: usize,
                                                  mut rng: &mut T)
