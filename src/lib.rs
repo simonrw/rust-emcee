@@ -21,6 +21,7 @@ pub use prob::Prob;
 use stretch::Stretch;
 use stores::{Chain, ProbStore};
 
+/// Affine-invariant Markov-chain Monte Carlo sampler
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
     naccepted: usize,
@@ -33,17 +34,27 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
 }
 
 impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
-    pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Self {
-        EnsembleSampler {
-            nwalkers: nwalkers,
-            iterations: 0,
-            lnprob: lnprob,
-            dim: dim,
-            naccepted: 0,
-            rng: Box::new(rand::thread_rng()),
-            chain: None,
-            probstore: None,
+    pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Result<Self> {
+        if nwalkers % 2 != 0 {
+            return Err(EmceeError::InvalidInputs("the number of walkers must be even"));
         }
+
+        if nwalkers <= 2 * dim {
+            let msg = "the number of walkers should be more than \
+                       twice the dimension of your parameter space";
+            return Err(EmceeError::InvalidInputs(msg));
+        }
+
+        Ok(EnsembleSampler {
+               nwalkers: nwalkers,
+               iterations: 0,
+               lnprob: lnprob,
+               dim: dim,
+               naccepted: 0,
+               rng: Box::new(rand::thread_rng()),
+               chain: None,
+               probstore: None,
+           })
     }
 
     pub fn seed(&mut self, seed: &[usize]) {
@@ -244,7 +255,7 @@ mod tests {
         let p0 = create_guess();
 
         let nwalkers = 10;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.sample(&params, 1).unwrap();
@@ -258,7 +269,7 @@ mod tests {
 
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.run_mcmc(&params, niters).unwrap();
@@ -293,8 +304,8 @@ mod tests {
         pos.push(Guess { values: vec![1.96861236e-06, 1.96861236e-06] });
         let foo = LinearModel::new(&real_x, &observed_y);
 
-        let nwalkers = 4;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo);
+        let nwalkers = 8;
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
         let lnprob = sampler.get_lnprob(&pos).unwrap();
         let expected: Vec<f32> = vec![-4613.19497084, -4613.277985, -4613.25381092, -4613.1954303];
         for (a, b) in lnprob.iter().zip(expected) {
@@ -328,7 +339,7 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
-        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
         let (a, b) = pos.split_at(nwalkers / 2);
 
         assert_eq!(a.len(), nwalkers / 2);
@@ -348,7 +359,7 @@ mod tests {
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
-        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo);
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
         sampler.seed(&[1]);
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
 
@@ -356,6 +367,30 @@ mod tests {
             /* Wide margins due to random numbers :( */
             assert_approx_eq!(chain.get(0, 0, niters - 2), 2.0f32, 0.03f32);
             assert_approx_eq!(chain.get(1, 0, niters - 2), 5.0f32, 0.4f32);
+        }
+    }
+
+    #[test]
+    fn test_nwalkers_even() {
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+        match EnsembleSampler::new(3, 3, &foo) {
+            Err(EmceeError::InvalidInputs(msg)) => {
+                assert!(msg.contains("number of walkers must be even"));
+            }
+            _ => panic!("incorrect"),
+        }
+    }
+
+    #[test]
+    fn test_enough_walkers() {
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+        match EnsembleSampler::new(4, 3, &foo) {
+            Err(EmceeError::InvalidInputs(msg)) => {
+                assert!(msg.contains("should be more than twice"));
+            }
+            _ => panic!("incorrect"),
         }
     }
 

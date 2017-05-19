@@ -111,7 +111,8 @@ fn main() {
     let nwalkers = 100;
     let pos = guess.create_initial_guess(nwalkers);
 
-    let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model);
+    let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+        .expect("creating sampler");
     sampler.run_mcmc(&pos, 500).unwrap();
 
     let flatchain = sampler.flatchain();
