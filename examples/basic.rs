@@ -11,6 +11,8 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use rand::distributions::{Range, Normal, IndependentSample};
 
+use emcee::{Guess, Prob};
+
 fn main() {
 
     /* Pre-generate rng and distributions */
@@ -49,7 +51,7 @@ fn main() {
      * Shortcut the least squares minimisation by starting the sampling
      * from the values found in the documentation
      */
-    let guess = emcee::Guess::new(&[-1.003, 4.528, 0.454]);
+    let guess = Guess::new(&[-1.003, 4.528, 0.454]);
 
     /*
      * Define the equivalent of lnprior, lnlike and lnprob (note: lnprob is automatically
@@ -61,8 +63,8 @@ fn main() {
         e: &'a [f32],
     };
 
-    impl<'a> emcee::Prob for LinearWithUnderestimatedErrors<'a> {
-        fn lnlike(&self, theta: &emcee::Guess) -> f32 {
+    impl<'a> Prob for LinearWithUnderestimatedErrors<'a> {
+        fn lnlike(&self, theta: &Guess) -> f32 {
             assert_eq!(theta.values.len(), 3);
             assert_eq!(self.x.len(), self.y.len());
             assert_eq!(self.y.len(), self.e.len());
@@ -81,7 +83,7 @@ fn main() {
 
         }
 
-        fn lnprior(&self, theta: &emcee::Guess) -> f32 {
+        fn lnprior(&self, theta: &Guess) -> f32 {
             assert_eq!(theta.values.len(), 3);
 
             let m = theta.values[0];

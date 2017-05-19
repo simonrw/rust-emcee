@@ -5,210 +5,21 @@ extern crate rand;
 #[macro_use]
 extern crate assert_approx_eq;
 
-use std::error::Error;
+pub mod errors;
+pub mod guess;
+pub mod prob;
+pub mod stretch;
+pub mod stores;
 
 use rand::{StdRng, Rng, SeedableRng};
-use rand::distributions::{Range, Normal, IndependentSample};
+use rand::distributions::{Range, IndependentSample};
 
-#[derive(Debug)]
-pub enum EmceeError {
-    Boxed(Box<Error>),
-}
+use errors::{EmceeError, Result};
+pub use guess::Guess;
+pub use prob::Prob;
 
-type Result<T> = ::std::result::Result<T, EmceeError>;
-
-#[derive(Debug, Clone)]
-pub struct Guess {
-    pub values: Vec<f32>,
-}
-
-impl Guess {
-    pub fn new(values: &[f32]) -> Self {
-        Guess { values: Vec::from(values) }
-    }
-
-    pub fn perturb(&self) -> Guess {
-        let mut new_values = self.values.clone();
-
-        let normal = Normal::new(0.0, 1E-5);
-        for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut rand::thread_rng()) as f32;
-        }
-
-        Guess { values: new_values }
-    }
-
-    pub fn perturb_with_rng<T: Rng>(&self, mut rng: &mut T) -> Guess {
-        let mut new_values = self.values.clone();
-
-        let normal = Normal::new(0.0, 1E-5);
-        for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut rng) as f32;
-        }
-
-        Guess { values: new_values }
-    }
-
-    pub fn create_initial_guess(&self, nwalkers: usize) -> Vec<Guess> {
-        (0..nwalkers).map(|_| self.perturb()).collect()
-    }
-
-    pub fn create_initial_guess_with_rng<T: Rng>(&self,
-                                                 nwalkers: usize,
-                                                 mut rng: &mut T)
-                                                 -> Vec<Guess> {
-        (0..nwalkers)
-            .map(|_| self.perturb_with_rng(&mut rng))
-            .collect()
-    }
-
-    pub fn contains_infs(&self) -> bool {
-        self.values.iter().any(|val| val.is_infinite())
-    }
-
-    pub fn contains_nans(&self) -> bool {
-        self.values.iter().any(|val| val.is_nan())
-    }
-}
-
-pub trait Prob {
-    fn lnlike(&self, params: &Guess) -> f32;
-    fn lnprior(&self, params: &Guess) -> f32;
-
-    fn lnprob(&self, params: &Guess) -> f32 {
-        let lnp = self.lnprior(params);
-        if lnp.is_finite() {
-            lnp + self.lnlike(params)
-        } else {
-            -std::f32::INFINITY
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-struct Stretch {
-    q: Vec<Guess>,
-    newlnprob: Vec<f32>,
-    accept: Vec<bool>,
-}
-
-impl Stretch {
-    pub fn preallocated_accept(N: usize) -> Stretch {
-        let mut s = Stretch::default();
-        s.accept.resize(N, false);
-        s
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct Chain {
-    data: Vec<f32>,
-    nparams: usize,
-    nwalkers: usize,
-    niterations: usize,
-}
-
-impl Chain {
-    pub fn new(nparams: usize, nwalkers: usize, niterations: usize) -> Chain {
-        Chain {
-            nparams: nparams,
-            nwalkers: nwalkers,
-            niterations: niterations,
-            data: vec![0f32; nparams * nwalkers * niterations],
-        }
-    }
-
-    pub fn set(&mut self, param_idx: usize, walker_idx: usize, iteration_idx: usize, value: f32) {
-        assert!(param_idx < self.nparams);
-        assert!(walker_idx < self.nwalkers);
-        assert!(iteration_idx < self.niterations);
-
-        let idx = self.index(param_idx, walker_idx, iteration_idx);
-
-        self.data[idx] = value;
-    }
-
-    pub fn get(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> f32 {
-        assert!(param_idx < self.nparams);
-        assert!(walker_idx < self.nwalkers);
-        assert!(iteration_idx < self.niterations);
-
-        let idx = self.index(param_idx, walker_idx, iteration_idx);
-
-        self.data[idx]
-    }
-
-    pub fn set_params(&mut self, walker_idx: usize, iteration_idx: usize, newdata: &[f32]) {
-        assert_eq!(newdata.len(), self.nparams);
-        for (idx, value) in newdata.iter().enumerate() {
-            self.set(idx, walker_idx, iteration_idx, *value);
-        }
-    }
-
-    pub fn flatchain(&self) -> Vec<Guess> {
-        let mut out = Vec::with_capacity(self.niterations * self.nwalkers);
-        let mut buffer = vec![0f32; self.nparams];
-        for iter in 0..self.niterations {
-            for walker in 0..self.nwalkers {
-                for i in 0..self.nparams {
-                    buffer[i] = self.get(i, walker, iter);
-                    out.push(Guess { values: buffer.clone() });
-                }
-            }
-        }
-        out
-    }
-
-    fn index(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> usize {
-        (iteration_idx * self.nwalkers * self.nparams) + (walker_idx * self.nparams) + param_idx
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct ProbStore {
-    data: Vec<f32>,
-    nwalkers: usize,
-    niterations: usize,
-}
-
-impl ProbStore {
-    pub fn new(nwalkers: usize, niterations: usize) -> ProbStore {
-        ProbStore {
-            nwalkers: nwalkers,
-            niterations: niterations,
-            data: vec![0f32; nwalkers * niterations],
-        }
-    }
-
-    pub fn set(&mut self, walker_idx: usize, iteration_idx: usize, value: f32) {
-        assert!(walker_idx < self.nwalkers);
-        assert!(iteration_idx < self.niterations);
-
-        let idx = self.index(walker_idx, iteration_idx);
-
-        self.data[idx] = value;
-    }
-
-    pub fn get(&self, walker_idx: usize, iteration_idx: usize) -> f32 {
-        assert!(walker_idx < self.nwalkers);
-        assert!(iteration_idx < self.niterations);
-
-        let idx = self.index(walker_idx, iteration_idx);
-
-        self.data[idx]
-    }
-
-    pub fn set_probs(&mut self, iteration_idx: usize, newdata: &[f32]) {
-        assert_eq!(newdata.len(), self.nwalkers);
-        for (idx, value) in newdata.iter().enumerate() {
-            self.set(idx, iteration_idx, *value);
-        }
-    }
-
-    fn index(&self, walker_idx: usize, iteration_idx: usize) -> usize {
-        (iteration_idx * self.nwalkers) + walker_idx
-    }
-}
+use stretch::Stretch;
+use stores::{Chain, ProbStore};
 
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
@@ -426,94 +237,6 @@ mod tests {
         }
     }
 
-
-    #[test]
-    fn test_pertubation() {
-        let guess = Guess::new(&[1.0f32, 2.0f32]);
-        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
-        let perturbed = guess.perturb_with_rng(&mut rng);
-        assert!(perturbed.values[0] != 1.0f32);
-        assert!(perturbed.values[1] != 2.0f32);
-    }
-
-    #[test]
-    fn test_initial_guess() {
-        let guess = Guess::new(&[1.0f32, 2.0f32]);
-        let initial = guess.create_initial_guess(10);
-        assert_eq!(initial.len(), 10);
-    }
-
-    #[test]
-    fn test_contains_infinites() {
-        let guess = Guess::new(&[std::f32::INFINITY]);
-        assert!(guess.contains_infs());
-
-        let guess = Guess::new(&[0f32]);
-        assert!(!guess.contains_infs());
-    }
-
-    #[test]
-    fn test_contains_nans() {
-        let guess = Guess::new(&[std::f32::NAN]);
-        assert!(guess.contains_nans());
-
-        let guess = Guess::new(&[0f32]);
-        assert!(!guess.contains_nans());
-    }
-
-    #[test]
-    fn test_chain() {
-        let nparams = 2;
-        let nwalkers = 10;
-        let niterations = 1000;
-        let mut chain = Chain::new(nparams, nwalkers, niterations);
-        assert_eq!(chain.data.len(), nparams * nwalkers * niterations);
-
-        assert_eq!(chain.index(0, 0, 0), 0);
-        assert_eq!(chain.index(1, 0, 0), 1);
-        assert_eq!(chain.index(0, 1, 0), 2);
-        assert_eq!(chain.index(1, 1, 0), 3);
-        assert_eq!(chain.index(0, 2, 0), 4);
-        assert_eq!(chain.index(0, 9, 0), 18);
-        assert_eq!(chain.index(0, 0, 1), 20);
-
-        chain.set(0, 1, 0, 2.0f32);
-        assert_eq!(chain.data[2], 2.0f32);
-        assert_eq!(chain.get(0, 1, 0), 2.0f32);
-
-
-        let newdata = vec![5.0f32, 100.0f32];
-        chain.set_params(1, 250, &newdata);
-
-        assert_eq!(chain.get(0, 1, 250), 5.0f32);
-        assert_eq!(chain.get(1, 1, 250), 100.0f32);
-    }
-
-    #[test]
-    fn test_probstore() {
-        let nwalkers = 4;
-        let niterations = 1000;
-        let mut store = ProbStore::new(nwalkers, niterations);
-        assert_eq!(store.data.len(), nwalkers * niterations);
-
-        assert_eq!(store.index(0, 0), 0);
-        assert_eq!(store.index(2, 0), 2);
-        assert_eq!(store.index(0, 1), 4);
-
-        store.set(1, 0, 2.0f32);
-        assert_eq!(store.data[1], 2.0f32);
-        assert_eq!(store.get(1, 0), 2.0f32);
-
-
-        let newdata = vec![5.0f32, 100.0f32, 1.0f32, 20f32];
-        store.set_probs(250, &newdata);
-
-        assert_eq!(store.get(0, 250), 5.0f32);
-        assert_eq!(store.get(1, 250), 100.0f32);
-        assert_eq!(store.get(3, 250), 20.0f32);
-    }
-
-
     #[test]
     fn test_single_sample() {
         let (real_x, observed_y) = generate_dataset(20);
@@ -670,6 +393,8 @@ mod tests {
     }
 
     fn generate_dataset(size: usize) -> (Vec<f32>, Vec<f32>) {
+        use rand::distributions::Normal;
+
         let mut rng = rand::thread_rng();
         let x_range = Range::new(0f32, 10f32);
         let norm_range = Normal::new(0.0, 3.0);
