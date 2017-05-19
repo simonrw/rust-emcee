@@ -30,8 +30,8 @@ impl Guess {
         let mut new_values = self.values.clone();
 
         let normal = Normal::new(0.0, 1E-5);
-        for i in 0..new_values.len() {
-            new_values[i] += normal.ind_sample(&mut rand::thread_rng()) as f32;
+        for elem in &mut new_values {
+            *elem += normal.ind_sample(&mut rand::thread_rng()) as f32;
         }
 
         Guess { values: new_values }
@@ -586,7 +586,7 @@ mod tests {
         assert_eq!(b.len(), nwalkers / 2);
 
         let lnprob = sampler.get_lnprob(&pos).unwrap();
-        let stretch = sampler.propose_stretch(&a, &b, &lnprob);
+        let _stretch = sampler.propose_stretch(&a, &b, &lnprob);
     }
 
     #[test]

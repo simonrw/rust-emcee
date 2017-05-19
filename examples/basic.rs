@@ -35,9 +35,9 @@ fn main() {
     let mut y = Vec::with_capacity(npoints);
     let mut yerr = Vec::with_capacity(npoints);
 
-    for i in 0..npoints {
+    for xval in &x {
         let yerr_val = 0.1 + 0.5 * unit_range.ind_sample(&mut rng);
-        let mut y_val = m_true * x[i] + b_true;
+        let mut y_val = m_true * xval + b_true;
         y_val += (f_true * y_val).abs() * norm_gen.ind_sample(&mut rng) as f32;
         y_val += yerr_val * norm_gen.ind_sample(&mut rng) as f32;
 
@@ -110,7 +110,7 @@ fn main() {
     let pos = guess.create_initial_guess(nwalkers);
 
     let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model);
-    let _ = sampler.run_mcmc(&pos, 500).unwrap();
+    sampler.run_mcmc(&pos, 500).unwrap();
 
     let flatchain = sampler.flatchain();
 
