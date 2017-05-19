@@ -1,42 +1,33 @@
 use rand::Rng;
 use rand::distributions::{Normal, IndependentSample};
 
+/// Represents an initial guess
+///
+/// This is the starting position for the sampling. All values are 32-bit floating point
+/// numbers, and are contained in a `Vec`.
 #[derive(Debug, Clone)]
 pub struct Guess {
     pub values: Vec<f32>,
 }
 
 impl Guess {
+    /// Create a guess from a slice
     pub fn new(values: &[f32]) -> Self {
         Guess { values: Vec::from(values) }
     }
 
-    pub fn perturb(&self) -> Guess {
-        let mut new_values = self.values.clone();
-
-        let normal = Normal::new(0.0, 1E-5);
-        for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut ::rand::thread_rng()) as f32;
-        }
-
-        Guess { values: new_values }
-    }
-
-    pub fn perturb_with_rng<T: Rng>(&self, mut rng: &mut T) -> Guess {
-        let mut new_values = self.values.clone();
-
-        let normal = Normal::new(0.0, 1E-5);
-        for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut rng) as f32;
-        }
-
-        Guess { values: new_values }
-    }
-
+    /// Create a guess vector, perturbed from the starting position
+    ///
+    /// Use this to generate the starting guess for the sampling, where there is one guess
+    /// slightly displaced from the staring location, per walker.
     pub fn create_initial_guess(&self, nwalkers: usize) -> Vec<Guess> {
         (0..nwalkers).map(|_| self.perturb()).collect()
     }
 
+    /// Create a guess vector with custom random number generator
+    ///
+    /// For example, providing a random number generator that has been seeded causes re-creatable
+    /// results. The random number generator must come from the `rand` crate.
     pub fn create_initial_guess_with_rng<T: Rng>(&self,
                                                  nwalkers: usize,
                                                  mut rng: &mut T)
@@ -52,6 +43,28 @@ impl Guess {
 
     pub fn contains_nans(&self) -> bool {
         self.values.iter().any(|val| val.is_nan())
+    }
+
+    fn perturb(&self) -> Guess {
+        let mut new_values = self.values.clone();
+
+        let normal = Normal::new(0.0, 1E-5);
+        for elem in &mut new_values {
+            *elem += normal.ind_sample(&mut ::rand::thread_rng()) as f32;
+        }
+
+        Guess { values: new_values }
+    }
+
+    fn perturb_with_rng<T: Rng>(&self, mut rng: &mut T) -> Guess {
+        let mut new_values = self.values.clone();
+
+        let normal = Normal::new(0.0, 1E-5);
+        for elem in &mut new_values {
+            *elem += normal.ind_sample(&mut rng) as f32;
+        }
+
+        Guess { values: new_values }
     }
 }
 

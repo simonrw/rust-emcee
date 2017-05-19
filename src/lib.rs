@@ -1,3 +1,5 @@
+//! `emcee` "The MCMC Hammer"
+
 #![allow(non_snake_case)]
 extern crate rand;
 
@@ -34,6 +36,13 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
 }
 
 impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
+    /// Create a new `EnsembleSampler`
+    ///
+    /// Errors are handled by returning a `Result` which contains
+    /// `EmceeError::InvalidInputs` error variant for the following errors:
+    ///
+    /// * the number of walkers must be even
+    /// * the number of walkers must be at least twice the number of parameters
     pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Result<Self> {
         if nwalkers % 2 != 0 {
             return Err(EmceeError::InvalidInputs("the number of walkers must be even"));
