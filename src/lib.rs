@@ -430,7 +430,8 @@ mod tests {
     #[test]
     fn test_pertubation() {
         let guess = Guess::new(&[1.0f32, 2.0f32]);
-        let perturbed = guess.perturb();
+        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let perturbed = guess.perturb_with_rng(&mut rng);
         assert!(perturbed.values[0] != 1.0f32);
         assert!(perturbed.values[1] != 2.0f32);
     }
