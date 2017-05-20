@@ -251,8 +251,12 @@
 //! [emcee-create-initial-guess]: guess/struct.Guess.html#method.create_initial_guess
 //! [emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
 
+#![recursion_limit = "1024"]
+
 #![allow(non_snake_case)]
 extern crate rand;
+#[macro_use]
+extern crate error_chain;
 
 #[cfg(test)]
 #[macro_use]
@@ -267,7 +271,7 @@ mod stores;
 use rand::{StdRng, Rng, SeedableRng};
 use rand::distributions::{Range, IndependentSample};
 
-use errors::{EmceeError, Result};
+use errors::*;
 pub use guess::Guess;
 pub use prob::Prob;
 
@@ -297,13 +301,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// number of parameters
     pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Result<Self> {
         if nwalkers % 2 != 0 {
-            return Err(EmceeError::InvalidInputs("the number of walkers must be even"));
+            return Err(ErrorKind::InvalidInputs("the number of walkers must be even").into());
         }
 
         if nwalkers <= 2 * dim {
             let msg = "the number of walkers should be more than \
                        twice the dimension of your parameter space";
-            return Err(EmceeError::InvalidInputs(msg));
+            return Err(ErrorKind::InvalidInputs(msg).into());
         }
 
         Ok(EnsembleSampler {
@@ -465,14 +469,14 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let mut lnprobs = Vec::with_capacity(p.len());
         for guess in p {
             if guess.contains_infs() {
-                return Err(EmceeError::Boxed("At least one parameter value was infinite".into()));
+                return Err("At least one parameter value was infinite".into());
             } else if guess.contains_nans() {
-                return Err(EmceeError::Boxed("At least one parameter value was NaN".into()));
+                return Err("At least one parameter value was NaN".into());
             }
 
             let result = self.lnprob.lnprob(guess);
             if result.is_nan() {
-                return Err(EmceeError::Boxed("NaN value of lnprob".into()));
+                return Err("NaN value of lnprob".into());
             } else {
                 lnprobs.push(result);
             }
@@ -648,8 +652,13 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
         match EnsembleSampler::new(3, 3, &foo) {
-            Err(EmceeError::InvalidInputs(msg)) => {
-                assert!(msg.contains("number of walkers must be even"));
+            Err(e) => {
+                match Error::from(e) {
+                    Error(ErrorKind::InvalidInputs(msg), _) => {
+                        assert!(msg.contains("number of walkers must be even"));
+                    }
+                    _ => panic!("incorrect"),
+                }
             }
             _ => panic!("incorrect"),
         }
@@ -660,8 +669,13 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
         match EnsembleSampler::new(4, 3, &foo) {
-            Err(EmceeError::InvalidInputs(msg)) => {
-                assert!(msg.contains("should be more than twice"));
+            Err(e) => {
+                match Error::from(e) {
+                    Error(ErrorKind::InvalidInputs(msg), _) => {
+                        assert!(msg.contains("should be more than twice"));
+                    }
+                    _ => panic!("incorrect"),
+                }
             }
             _ => panic!("incorrect"),
         }

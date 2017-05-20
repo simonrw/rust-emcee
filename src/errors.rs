@@ -1,9 +1,8 @@
-use std::error::Error;
-
-#[derive(Debug)]
-pub enum EmceeError {
-    Boxed(Box<Error>),
-    InvalidInputs(&'static str),
+error_chain! {
+    errors {
+        InvalidInputs(t: &'static str) {
+            description("invalid inputs")
+            display("invalid inputs: '{}'", t)
+        }
+    }
 }
-
-pub type Result<T> = ::std::result::Result<T, EmceeError>;
