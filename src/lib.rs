@@ -1,4 +1,255 @@
 //! `emcee` "The MCMC Hammer"
+//!
+//! A re-implementation of [`emcee`][1] in Rust. This library includes an implementation
+//! of Goodman & Weare's [Affine Invariant Markov chain Monte Carlo (MCMC) Ensemble
+//! sampler][2]. All credit for this crate belongs to [Dan Foreman-Mackey][3], the original
+//! author of [`emcee`][1]
+//!
+//! ## Basic usage
+//!
+//! ### Implementing models
+//!
+//! The sampler requires a struct that implements [`emcee::Prob`][emcee-prob], for example:
+//!
+//! ```rust
+//! use emcee::{Guess, Prob};
+//!
+//! struct Model;
+//!
+//! impl Prob for Model {
+//!     fn lnlike(&self, params: &Guess) -> f32 {
+//!         // Insert actual implementation here
+//!         0f32
+//!     }
+//!
+//!     fn lnprior(&self, params: &Guess) -> f32 {
+//!         // Insert actual implementation here
+//!         0f32
+//!     }
+//! }
+//! ```
+//!
+//! The trait has a default implementation for [`lnprob`][emcee-lnprob] which computes the product
+//! of the likelihood and prior probability (sum in log space) as per Bayes' rule.  Invalid prior
+//! values are marked by returning -[`std::f32::INFINITY`][std-infinity] from the priors function.
+//! Note your implementation is likely to need external data. This data should be included with
+//! your `Model` class, for example:
+//!
+//! ```rust
+//! # use emcee::{Guess, Prob};
+//! struct Model<'a> {
+//!     x: &'a [f32],
+//!     y: &'a [f32],
+//! }
+//!
+//! // Linear model y = m * x + c
+//! impl<'a> Prob for Model<'a> {
+//!     fn lnlike(&self, params: &Guess) -> f32 {
+//!         let m = params.values[0];
+//!         let c = params.values[1];
+//!
+//!         -0.5 * self.x.iter().zip(self.y)
+//!             .map(|(xval, yval)| {
+//!                 let model = m * xval + c;
+//!                 let residual = (yval - model).powf(2.0);
+//!                 residual
+//!             }).sum::<f32>()
+//!     }
+//!
+//!     fn lnprior(&self, params: &Guess) -> f32 {
+//!         // unimformative priors
+//!         0.0f32
+//!     }
+//! }
+//!
+//! ```
+//!
+//! ### Initial guess
+//!
+//! Next, construct an initial guess. A [`Guess`][emcee-guess] represents a proposal parameter
+//! vector:
+//!
+//! ```rust
+//! use emcee::Guess;
+//!
+//! let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! ```
+//!
+//! The sampler implemented by this create uses multiple *walkers*, and as such the initial
+//! guess must be replicated once per walker, and typically dispersed from the initial position
+//! to aid exploration of the problem parameter space. This can be achieved with the
+//! [`create_initial_guess`][emcee-create-initial-guess] method:
+//!
+//! ```rust
+//! # use emcee::Guess;
+//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! let nwalkers = 100;
+//! let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
+//! assert_eq!(perturbed_guess.len(), nwalkers);
+//! ```
+//!
+//! ### Constructing a sampler
+//!
+//! The sampler generates new parameter vectors, assess the probability using a user-supplied
+//! probability model, accepts more likely parameter vectors and iterates for a number of
+//! iterations.
+//!
+//! The sampler needs to know the number of walkers to use, which must be an even number
+//! and at least twice the size of your parameter vector. It also needs the size of your
+//! parameter vector, and your probability struct (which implements [`Prob`][emcee-prob]):
+//!
+//! ```rust
+//! # use emcee::{Guess, Prob};
+//! let nwalkers = 100;
+//! let ndim = 2;  // m and c
+//!
+//! // Build a linear model y = m * x + c (see above)
+//! # struct Model<'a> {
+//! #     x: &'a [f32],
+//! #     y: &'a [f32],
+//! # }
+//! # // Linear model y = m * x + c
+//! # impl<'a> Prob for Model<'a> {
+//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #         let m = params.values[0];
+//! #         let c = params.values[1];
+//! #         -0.5 * self.x.iter().zip(self.y)
+//! #             .map(|(xval, yval)| {
+//! #                 let model = m * xval + c;
+//! #                 let residual = (yval - model).powf(2.0);
+//! #                 residual
+//! #             }).sum::<f32>()
+//! #     }
+//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #         // unimformative priors
+//! #         0.0f32
+//! #     }
+//! # }
+//!
+//! let initial_x = [0.0f32, 1.0f32, 2.0f32];
+//! let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//!
+//! let model = Model {
+//!     x: &initial_x,
+//!     y: &initial_y,
+//! };
+//!
+//! let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//!     .expect("could not create sampler");
+//! ```
+//!
+//! Then run the sampler:
+//!
+//! ```rust
+//! # use emcee::{Guess, Prob};
+//! # let nwalkers = 100;
+//! # let ndim = 2;  // m and c
+//! # struct Model<'a> {
+//! #     x: &'a [f32],
+//! #     y: &'a [f32],
+//! # }
+//! # // Linear model y = m * x + c
+//! # impl<'a> Prob for Model<'a> {
+//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #         let m = params.values[0];
+//! #         let c = params.values[1];
+//! #         -0.5 * self.x.iter().zip(self.y)
+//! #             .map(|(xval, yval)| {
+//! #                 let model = m * xval + c;
+//! #                 let residual = (yval - model).powf(2.0);
+//! #                 residual
+//! #             }).sum::<f32>()
+//! #     }
+//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #         // unimformative priors
+//! #         0.0f32
+//! #     }
+//! # }
+//! #
+//! # let initial_x = [0.0f32, 1.0f32, 2.0f32];
+//! # let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! #
+//! # let model = Model {
+//! #     x: &initial_x,
+//! #     y: &initial_y,
+//! # };
+//! #
+//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! #     .expect("could not create sampler");
+//! #
+//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
+//! let niterations = 100;
+//! sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
+//! ```
+//!
+//! ### Studying the results
+//!
+//! The samples are stored in the sampler's `flatchain` which is constructed through the
+//! [`flatchain`][emcee-flatchain] method on the sampler:
+//!
+//! ```rust
+//! # use emcee::{Guess, Prob};
+//! # let nwalkers = 100;
+//! # let ndim = 2;  // m and c
+//! # struct Model<'a> {
+//! #     x: &'a [f32],
+//! #     y: &'a [f32],
+//! # }
+//! # // Linear model y = m * x + c
+//! # impl<'a> Prob for Model<'a> {
+//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #         let m = params.values[0];
+//! #         let c = params.values[1];
+//! #         -0.5 * self.x.iter().zip(self.y)
+//! #             .map(|(xval, yval)| {
+//! #                 let model = m * xval + c;
+//! #                 let residual = (yval - model).powf(2.0);
+//! #                 residual
+//! #             }).sum::<f32>()
+//! #     }
+//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #         // unimformative priors
+//! #         0.0f32
+//! #     }
+//! # }
+//! #
+//! # let initial_x = [0.0f32, 1.0f32, 2.0f32];
+//! # let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! #
+//! # let model = Model {
+//! #     x: &initial_x,
+//! #     y: &initial_y,
+//! # };
+//! #
+//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! #     .expect("could not create sampler");
+//! #
+//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
+//! # let niterations = 100;
+//! # sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
+//! let flatchain = sampler.flatchain();
+//!
+//! for (i, guess) in flatchain.iter().enumerate() {
+//!     // Skip possible "burn-in" phase
+//!     if i < 50 * nwalkers {
+//!         continue;
+//!     }
+//!
+//!     println!("Iteration {}; m={}, c={}", i, guess.values[0], guess.values[1]);
+//! }
+//! ```
+//!
+//! [1]: http://dan.iel.fm/emcee/current/
+//! [2]: http://msp.berkeley.edu/camcos/2010/5-1/p04.xhtml
+//! [3]: http://dan.iel.fm/
+//! [emcee-prob]: prob/trait.Prob.html
+//! [emcee-guess]: guess/struct.Guess.html
+//! [emcee-lnprob]: prob/trait.Prob.html#method.lnprob
+//! [std-infinity]: https://doc.rust-lang.org/std/f32/constant.INFINITY.html
+//! [emcee-create-initial-guess]: guess/struct.Guess.html#method.create_initial_guess
+//! [emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
 
 #![allow(non_snake_case)]
 extern crate rand;
@@ -7,11 +258,11 @@ extern crate rand;
 #[macro_use]
 extern crate assert_approx_eq;
 
-pub mod errors;
-pub mod guess;
-pub mod prob;
-pub mod stretch;
-pub mod stores;
+mod errors;
+mod guess;
+mod prob;
+mod stretch;
+mod stores;
 
 use rand::{StdRng, Rng, SeedableRng};
 use rand::distributions::{Range, IndependentSample};
@@ -67,11 +318,17 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
            })
     }
 
+    /// Swap the built in random number generator for a seedable one
+    ///
+    /// This means the random number generation can be reproducable. Seed is whatever
+    /// [`SeedableRng.from_seed`]
+    /// (https://docs.rs/rand/0.3.15/rand/trait.SeedableRng.html#tymethod.from_seed)
+    /// accepts.
     pub fn seed(&mut self, seed: &[usize]) {
         self.rng = Box::new(StdRng::from_seed(seed));
     }
 
-    pub fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
+    fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
         let halfk = self.nwalkers / 2;
 
         /* Loop state */
@@ -135,20 +392,26 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         Ok(())
     }
 
+    /// Run the sampling
+    ///
+    /// This runs the sampler for `N` iterations. Errors are signalled by the function returning
+    /// a `Result`
     pub fn run_mcmc(&mut self, p0: &[Guess], N: usize) -> Result<()> {
         self.sample(p0, N)
     }
 
-    pub fn reset(&mut self) {
-        self.iterations = 0;
-        self.naccepted = 0;
-    }
-
+    /// Return the samples as computed by the sampler
     pub fn flatchain(&self) -> Vec<Guess> {
         match self.chain {
             Some(ref chain) => chain.flatchain(),
             None => unreachable!(),
         }
+    }
+
+    /// Return the sampler to its default state
+    pub fn reset(&mut self) {
+        self.iterations = 0;
+        self.naccepted = 0;
     }
 
     // Internal functions
