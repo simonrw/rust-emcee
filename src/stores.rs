@@ -89,15 +89,6 @@ impl ProbStore {
         self.data[idx] = value;
     }
 
-    pub fn get(&self, walker_idx: usize, iteration_idx: usize) -> f32 {
-        assert!(walker_idx < self.nwalkers);
-        assert!(iteration_idx < self.niterations);
-
-        let idx = self.index(walker_idx, iteration_idx);
-
-        self.data[idx]
-    }
-
     pub fn set_probs(&mut self, iteration_idx: usize, newdata: &[f32]) {
         assert_eq!(newdata.len(), self.nwalkers);
         for (idx, value) in newdata.iter().enumerate() {
@@ -155,15 +146,24 @@ mod test {
 
         store.set(1, 0, 2.0f32);
         assert_eq!(store.data[1], 2.0f32);
-        assert_eq!(store.get(1, 0), 2.0f32);
+        assert_eq!(store_get(&store, 1, 0), 2.0f32);
 
 
         let newdata = vec![5.0f32, 100.0f32, 1.0f32, 20f32];
         store.set_probs(250, &newdata);
 
-        assert_eq!(store.get(0, 250), 5.0f32);
-        assert_eq!(store.get(1, 250), 100.0f32);
-        assert_eq!(store.get(3, 250), 20.0f32);
+        assert_eq!(store_get(&store, 0, 250), 5.0f32);
+        assert_eq!(store_get(&store, 1, 250), 100.0f32);
+        assert_eq!(store_get(&store, 3, 250), 20.0f32);
+    }
+
+    fn store_get(store: &ProbStore, walker_idx: usize, iteration_idx: usize) -> f32 {
+        assert!(walker_idx < store.nwalkers);
+        assert!(iteration_idx < store.niterations);
+
+        let idx = store.index(walker_idx, iteration_idx);
+
+        store.data[idx]
     }
 
 }
