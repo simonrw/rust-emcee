@@ -14,7 +14,7 @@ version = "0.1.1"
 [badges]
 
 [badges.travis-ci]
-repository = "https://github.com/mindriot101/rust-emcee"
+repository = "mindriot101/rust-emcee"
 
 [dependencies]
 error-chain = "0.10.0"
