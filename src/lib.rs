@@ -364,7 +364,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 let &(I0, _) = val.0;
                 let &(S0, S1) = val.1;
 
-                let stretch = self.propose_stretch(S0, S1, &lnprob);
+                let stretch = self.propose_stretch(S0, S1, &lnprob)?;
 
                 if stretch.accept.iter().any(|val| *val) {
                     /* Update the positions, log probabilities and acceptance counts */
@@ -437,7 +437,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
     // Internal functions
 
-    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f32]) -> Stretch {
+    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f32]) -> Result<Stretch> {
+        assert_eq!(p0.len() + p1.len(), self.nwalkers);
         let Ns = p0.len();
         let Nc = p1.len();
 
@@ -468,7 +469,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         assert_eq!(q.len(), zz.len());
 
         let mut out = Stretch::preallocated_accept(Ns);
-        out.newlnprob = self.get_lnprob(&q).unwrap();
+        out.newlnprob = self.get_lnprob(&q)?;
         out.q = q;
 
         for i in 0..Ns {
@@ -478,8 +479,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 out.accept[i] = true;
             }
         }
-
-        out
+        Ok(out)
     }
 
     fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f32>> {
@@ -665,7 +665,7 @@ mod tests {
         assert_eq!(b.len(), nwalkers / 2);
 
         let lnprob = sampler.get_lnprob(&pos).unwrap();
-        let _stretch = sampler.propose_stretch(&a, &b, &lnprob);
+        let _stretch = sampler.propose_stretch(&a, &b, &lnprob).unwrap();
     }
 
     #[test]
