@@ -4,7 +4,7 @@
 [![Crates version](https://img.shields.io/crates/v/emcee.svg)](https://crates.io/crates/emcee)
 [![Docs](https://img.shields.io/badge/docs-emcee-brightgreen.svg)](https://docs.rs/emcee)
 
-A re-implementation of [emcee][emcee] in Rust.
+A re-implementation of [Dan Foreman-Mackey's][dfm] [emcee][emcee] in Rust.
 
 See the [hosted documentation here][docs]
 
@@ -14,6 +14,8 @@ data"][fitting-model-to-data-python] example from the `emcee` documentation.
 ## Attribution
 
 If you make use of emcee in your work, please cite Dan's paper ([arXiv](http://arxiv.org/abs/1202.3665), [ADS](http://adsabs.harvard.edu/abs/2013PASP..125..306F), [BibTeX](http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2013PASP..125..306F&data_type=BIBTEX)).
+
+A copy of the original MIT license is given under [DFM-LICENSE][dfm-license].
 
 ## Basic usage
 
@@ -158,3 +160,5 @@ for (i, guess) in flatchain.iter().enumerate() {
 [docs]: https://docs.rs/emcee
 [fitting-model-to-data]: https://github.com/mindriot101/rust-emcee/blob/master/examples/fitting_a_model_to_data.rs
 [fitting-model-to-data-python]: http://dan.iel.fm/emcee/current/user/line/
+[dfm]: http://dan.iel.fm/
+[dfm-license]: https://github.com/mindriot101/rust-emcee/blob/master/DFM-LICENSE
