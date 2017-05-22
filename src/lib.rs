@@ -352,7 +352,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
 
         for iter in 0..iterations {
-            self.iterations = iter;;
+            self.iterations = iter;
             let cloned = p.clone();
             let (first_half, second_half) = cloned.split_at(halfk);
             let (first_i, second_i) = indices.split_at(halfk);
@@ -724,23 +724,39 @@ mod tests {
     }
 
     #[test]
-    fn test_acceptance_fraction() {
-        let (real_x, observed_y) = load_baked_dataset();
-        let foo = LinearModel::new(&real_x, &observed_y);
-        let nwalkers = 20;
-        let p0 = Guess { values: vec![0f32, 0f32] };
-        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
-        let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
-        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
-        sampler.seed(&[1]);
-        sampler.run_mcmc(&pos, 1000).unwrap();
+    fn test_lnprob_gaussian() {
+        // Testing the probability model for the multivariate test
+        let icov = [[318.92634269,
+                     531.39511426,
+                     -136.10315845,
+                     154.17685545,
+                     552.308813],
+                    [531.39511426,
+                     899.91793286,
+                     -224.74333441,
+                     258.98686842,
+                     938.32014715],
+                    [-136.10315845,
+                     -224.74333441,
+                     60.61145495,
+                     -66.68898448,
+                     -232.52035701],
+                    [154.17685545,
+                     258.98686842,
+                     -66.68898448,
+                     83.9979827,
+                     266.44429402],
+                    [552.308813,
+                     938.32014715,
+                     -232.52035701,
+                     266.44429402,
+                     983.33032073]];
 
-        for (i, fraction) in sampler.acceptance_fraction().iter().enumerate() {
-            assert!(*fraction > 0.25,
-                    "walker {} got acceptance fraction: {}",
-                    i,
-                    fraction);
-        }
+        let guess = Guess::new(&[5., 5., 5., 5., 5.]);
+        let expected = -80374.206; // value as computed by Python
+
+        let p = MultivariateProb { icov: (&icov) };
+        assert_approx_eq!(p.lnprob(&guess), expected);
     }
 
     #[test]
@@ -802,7 +818,7 @@ mod tests {
         }
 
         for value in result.values {
-            assert!(value < maxdiff, "value: {}, maxdiff: {}", value, maxdiff);
+            assert!((value / niter as f32).powf(2.0) < maxdiff, "value: {}, maxdiff: {}", value, maxdiff);
         }
     }
 
