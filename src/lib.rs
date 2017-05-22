@@ -5,6 +5,14 @@
 //! sampler][2]. All credit for this crate belongs to [Dan Foreman-Mackey][3], the original
 //! author of [`emcee`][1]
 //!
+//! ## Attribution
+//!
+//! If you make use of emcee in your work, please cite Dan's paper
+//! ([arXiv](http://arxiv.org/abs/1202.3665),
+//! [ADS](http://adsabs.harvard.edu/abs/2013PASP..125..306F),
+//! [BibTeX]
+//! (http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2013PASP..125..306F&data_type=BIBTEX)).
+//!
 //! ## Basic usage
 //!
 //! ### Implementing models

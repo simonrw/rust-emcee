@@ -4,14 +4,157 @@
 [![Crates version](https://img.shields.io/crates/v/emcee.svg)](https://crates.io/crates/emcee)
 [![Docs](https://img.shields.io/badge/docs-emcee-brightgreen.svg)](https://docs.rs/emcee)
 
-A re-implementation of [emcee][1] in Rust.
+A re-implementation of [emcee][emcee] in Rust.
 
-See the [hosted documentation here][2]
+See the [hosted documentation here][docs]
 
-The [`fitting_a_model_to_data` example][3] is a re-creation of the ["fitting a model to
-data"][4] example from the `emcee` documentation.
+The [`fitting_a_model_to_data` example][fitting-model-to-data] is a re-creation of the ["fitting a model to
+data"][fitting-model-to-data-python] example from the `emcee` documentation.
 
-[1]: http://dan.iel.fm/emcee/current/
-[2]: https://docs.rs/emcee
-[3]: https://github.com/mindriot101/rust-emcee/blob/master/examples/fitting_a_model_to_data.rs
-[4]: http://dan.iel.fm/emcee/current/user/line/
+## Attribution
+
+If you make use of emcee in your work, please cite Dan's paper ([arXiv](http://arxiv.org/abs/1202.3665), [ADS](http://adsabs.harvard.edu/abs/2013PASP..125..306F), [BibTeX](http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2013PASP..125..306F&data_type=BIBTEX)).
+
+## Basic usage
+
+### Implementing models
+
+The sampler requires a struct that implements [`emcee::Prob`][emcee-prob], for example:
+
+```rust
+use emcee::{Guess, Prob};
+
+struct Model;
+
+impl Prob for Model {
+    fn lnlike(&self, params: &Guess) -> f32 {
+        // Insert actual implementation here
+        0f32
+    }
+
+    fn lnprior(&self, params: &Guess) -> f32 {
+        // Insert actual implementation here
+        0f32
+    }
+}
+```
+
+The trait has a default implementation for [`lnprob`][emcee-lnprob] which computes the product
+of the likelihood and prior probability (sum in log space) as per Bayes' rule.  Invalid prior
+values are marked by returning -[`std::f32::INFINITY`][std-infinity] from the priors function.
+Note your implementation is likely to need external data. This data should be included with
+your `Model` class, for example:
+
+```rust
+struct Model<'a> {
+    x: &'a [f32],
+    y: &'a [f32],
+}
+
+// Linear model y = m * x + c
+impl<'a> Prob for Model<'a> {
+    fn lnlike(&self, params: &Guess) -> f32 {
+        let m = params.values[0];
+        let c = params.values[1];
+
+        -0.5 * self.x.iter().zip(self.y)
+            .map(|(xval, yval)| {
+                let model = m * xval + c;
+                let residual = (yval - model).powf(2.0);
+                residual
+            }).sum::<f32>()
+    }
+
+    fn lnprior(&self, params: &Guess) -> f32 {
+        // unimformative priors
+        0.0f32
+    }
+}
+
+```
+
+### Initial guess
+
+Next, construct an initial guess. A [`Guess`][emcee-guess] represents a proposal parameter
+vector:
+
+```rust
+use emcee::Guess;
+
+let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+```
+
+The sampler implemented by this create uses multiple *walkers*, and as such the initial
+guess must be replicated once per walker, and typically dispersed from the initial position
+to aid exploration of the problem parameter space. This can be achieved with the
+[`create_initial_guess`][emcee-create-initial-guess] method:
+
+```rust
+let nwalkers = 100;
+let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
+assert_eq!(perturbed_guess.len(), nwalkers);
+```
+
+### Constructing a sampler
+
+The sampler generates new parameter vectors, assess the probability using a user-supplied
+probability model, accepts more likely parameter vectors and iterates for a number of
+iterations.
+
+The sampler needs to know the number of walkers to use, which must be an even number
+and at least twice the size of your parameter vector. It also needs the size of your
+parameter vector, and your probability struct (which implements [`Prob`][emcee-prob]):
+
+```rust
+let nwalkers = 100;
+let ndim = 2;  // m and c
+
+// Build a linear model y = m * x + c (see above)
+
+let initial_x = [0.0f32, 1.0f32, 2.0f32];
+let initial_y = [5.0f32, 7.0f32, 9.0f32];
+
+let model = Model {
+    x: &initial_x,
+    y: &initial_y,
+};
+
+let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+    .expect("could not create sampler");
+```
+
+Then run the sampler:
+
+```rust
+let niterations = 100;
+sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
+```
+
+### Studying the results
+
+The samples are stored in the sampler's `flatchain` which is constructed through the
+[`flatchain`][emcee-flatchain] method on the sampler:
+
+```rust
+let flatchain = sampler.flatchain();
+
+for (i, guess) in flatchain.iter().enumerate() {
+    // Skip possible "burn-in" phase
+    if i < 50 * nwalkers {
+        continue;
+    }
+
+    println!("Iteration {}; m={}, c={}", i, guess.values[0], guess.values[1]);
+}
+```
+
+[emcee]: http://dan.iel.fm/emcee/current/
+[emcee-prob]: prob/trait.Prob.html
+[emcee-guess]: guess/struct.Guess.html
+[emcee-lnprob]: prob/trait.Prob.html#method.lnprob
+[std-infinity]: https://doc.rust-lang.org/std/f32/constant.INFINITY.html
+[emcee-create-initial-guess]: guess/struct.Guess.html#method.create_initial_guess
+[emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
+[docs]: https://docs.rs/emcee
+[fitting-model-to-data]: https://github.com/mindriot101/rust-emcee/blob/master/examples/fitting_a_model_to_data.rs
+[fitting-model-to-data-python]: http://dan.iel.fm/emcee/current/user/line/
