@@ -289,7 +289,7 @@ use stores::{Chain, ProbStore};
 /// Affine-invariant Markov-chain Monte Carlo sampler
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
-    naccepted: usize,
+    naccepted: Vec<usize>,
     iterations: usize,
     lnprob: &'a T,
     dim: usize,
@@ -323,7 +323,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                iterations: 0,
                lnprob: lnprob,
                dim: dim,
-               naccepted: 0,
+               naccepted: vec![0; nwalkers],
                rng: Box::new(rand::thread_rng()),
                chain: None,
                probstore: None,
@@ -375,6 +375,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                         }
 
                         let idx = I0[j]; // position in the parameter vector
+                        self.naccepted[idx] += 1;
                         assert!(idx < lnprob.len());
                         lnprob[idx] = stretch.newlnprob[j];
 
@@ -420,10 +421,18 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         }
     }
 
+    /// Return the number of iterations accepted, one value per walker
+    pub fn acceptance_fraction(&self) -> Vec<f32> {
+        self.naccepted
+            .iter()
+            .map(|naccepted| *naccepted as f32 / self.iterations as f32)
+            .collect()
+    }
+
     /// Return the sampler to its default state
     pub fn reset(&mut self) {
         self.iterations = 0;
-        self.naccepted = 0;
+        self.naccepted.resize(0, 0);
     }
 
     // Internal functions
@@ -496,7 +505,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
 #[cfg(test)]
 mod tests {
-
+    use rand::distributions::Normal;
     use super::*;
 
     const REAL_M: f32 = 2.0f32;
@@ -532,6 +541,31 @@ mod tests {
             -sum
         }
     }
+
+
+    struct MultivariateProb<'a> {
+        icov: &'a [[f32; 5]; 5],
+    }
+
+    impl<'a> Prob for MultivariateProb<'a> {
+        // Stub methods as they are not used
+        fn lnlike(&self, _params: &Guess) -> f32 {
+            0.0f32
+        }
+        fn lnprior(&self, _params: &Guess) -> f32 {
+            0.0f32
+        }
+
+        fn lnprob(&self, params: &Guess) -> f32 {
+            let mut values = [0f32; 5];
+            for (i, value) in params.values.iter().enumerate() {
+                values[i] = *value;
+            }
+            let inv_prod = mat_vec_mul(&self.icov, &values);
+            -vec_vec_mul(&values, &inv_prod) / 2.0
+        }
+    }
+
 
     #[test]
     fn test_single_sample() {
@@ -690,32 +724,27 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    fn test_acceptance_fraction() {
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let nwalkers = 20;
+        let p0 = Guess { values: vec![0f32, 0f32] };
+        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
+        sampler.seed(&[1]);
+        sampler.run_mcmc(&pos, 1000).unwrap();
+
+        for (i, fraction) in sampler.acceptance_fraction().iter().enumerate() {
+            assert!(*fraction > 0.25,
+                    "walker {} got acceptance fraction: {}",
+                    i,
+                    fraction);
+        }
+    }
+
+    #[test]
     fn test_multivariate() {
-        use rand::distributions::Normal;
-        struct Foo<'a> {
-            icov: &'a [[f32; 5]; 5],
-        }
-
-        impl<'a> Prob for Foo<'a> {
-            // Stub methods as they are not used
-            fn lnlike(&self, _params: &Guess) -> f32 {
-                0.0f32
-            }
-            fn lnprior(&self, _params: &Guess) -> f32 {
-                0.0f32
-            }
-
-            fn lnprob(&self, params: &Guess) -> f32 {
-                let mut values = [0f32; 5];
-                for (i, value) in params.values.iter().enumerate() {
-                    values[i] = *value;
-                }
-                let inv_prod = mat_vec_mul(&self.icov, &values);
-                -vec_vec_mul(&values, &inv_prod) / 2.0
-            }
-        }
-
         let nwalkers = 100;
         let ndim = 5;
         let niter = 1000;
@@ -745,7 +774,7 @@ mod tests {
                      -232.52035701,
                      266.44429402,
                      983.33032073]];
-        let model = Foo { icov: &icov };
+        let model = MultivariateProb { icov: &icov };
 
         let norm_range = Normal::new(0.0f64, 1.0f64);
         let p0: Vec<_> = (0..nwalkers)
