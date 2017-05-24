@@ -53,8 +53,8 @@
 //! // Linear model y = m * x + c
 //! impl<'a> Prob for Model<'a> {
 //!     fn lnlike(&self, params: &Guess) -> f32 {
-//!         let m = params.values[0];
-//!         let c = params.values[1];
+//!         let m = params[0];
+//!         let c = params[1];
 //!
 //!         -0.5 * self.x.iter().zip(self.y)
 //!             .map(|(xval, yval)| {
@@ -119,8 +119,8 @@
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
 //! #     fn lnlike(&self, params: &Guess) -> f32 {
-//! #         let m = params.values[0];
-//! #         let c = params.values[1];
+//! #         let m = params[0];
+//! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
 //! #             .map(|(xval, yval)| {
 //! #                 let model = m * xval + c;
@@ -159,8 +159,8 @@
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
 //! #     fn lnlike(&self, params: &Guess) -> f32 {
-//! #         let m = params.values[0];
-//! #         let c = params.values[1];
+//! #         let m = params[0];
+//! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
 //! #             .map(|(xval, yval)| {
 //! #                 let model = m * xval + c;
@@ -207,8 +207,8 @@
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
 //! #     fn lnlike(&self, params: &Guess) -> f32 {
-//! #         let m = params.values[0];
-//! #         let c = params.values[1];
+//! #         let m = params[0];
+//! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
 //! #             .map(|(xval, yval)| {
 //! #                 let model = m * xval + c;
@@ -245,7 +245,7 @@
 //!         continue;
 //!     }
 //!
-//!     println!("Iteration {}; m={}, c={}", i, guess.values[0], guess.values[1]);
+//!     println!("Iteration {}; m={}, c={}", i, guess[0], guess[1]);
 //! }
 //! ```
 //!
@@ -531,8 +531,8 @@ mod tests {
         }
 
         fn lnlike(&self, params: &Guess) -> f32 {
-            let m = params.values[0];
-            let c = params.values[1];
+            let m = params[0];
+            let c = params[1];
             let sum = self.x
                 .iter()
                 .zip(self.y)
@@ -837,7 +837,7 @@ mod tests {
 
         for i in 0..sampler.nwalkers * niter {
             for j in 0..sampler.dim {
-                result.values[j] += (chain[i].values[j] / niter as f32).powf(2.0);
+                result[j] += (chain[i][j] / niter as f32).powf(2.0);
             }
         }
 

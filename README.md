@@ -56,8 +56,8 @@ struct Model<'a> {
 // Linear model y = m * x + c
 impl<'a> Prob for Model<'a> {
     fn lnlike(&self, params: &Guess) -> f32 {
-        let m = params.values[0];
-        let c = params.values[1];
+        let m = params[0];
+        let c = params[1];
 
         -0.5 * self.x.iter().zip(self.y)
             .map(|(xval, yval)| {
@@ -146,7 +146,7 @@ for (i, guess) in flatchain.iter().enumerate() {
         continue;
     }
 
-    println!("Iteration {}; m={}, c={}", i, guess.values[0], guess.values[1]);
+    println!("Iteration {}; m={}, c={}", i, guess[0], guess[1]);
 }
 ```
 

@@ -25,8 +25,8 @@ use guess::Guess;
 ///
 /// impl<'a> Prob for Foo<'a> {
 ///     fn lnlike(&self, params: &Guess) -> f32 {
-///         let m = params.values[0];
-///         let c = params.values[1];
+///         let m = params[0];
+///         let c = params[1];
 ///
 ///         let mut result = 0.;
 ///         for i in 9..self.x.len() {
@@ -38,8 +38,8 @@ use guess::Guess;
 ///     }
 ///
 ///     fn lnprior(&self, params: &Guess) -> f32 {
-///         let m = params.values[0];
-///         let c = params.values[1];
+///         let m = params[0];
+///         let c = params[1];
 ///
 ///         if (m > -5.) && (m < 5.) && (c > -10.) && (c < 10.) {
 ///             0.0
