@@ -472,9 +472,12 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         out.newlnprob = self.get_lnprob(&q)?;
         out.q = q;
 
+        assert_eq!(out.newlnprob.len(), Ns);
+
         for i in 0..Ns {
-            let dim = p0[0].values.len();
-            let lnpdiff = ((dim - 1) as f32) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
+            let dim = p0[0].values.len() as f32;
+            assert!(zz[i] > 0.);
+            let lnpdiff = (dim - 1.0) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
             if lnpdiff > unit_range.ind_sample(&mut self.rng).ln() {
                 out.accept[i] = true;
             }
@@ -483,7 +486,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f32>> {
-        let mut lnprobs = Vec::with_capacity(p.len());
+        let mut lnprobs = Vec::with_capacity(self.dim);
         for guess in p {
             if guess.contains_infs() {
                 return Err("At least one parameter value was infinite".into());
@@ -494,9 +497,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             let result = self.lnprob.lnprob(guess);
             if result.is_nan() {
                 return Err("NaN value of lnprob".into());
-            } else {
-                lnprobs.push(result);
             }
+
+            lnprobs.push(result);
         }
 
         Ok(lnprobs)
