@@ -825,12 +825,15 @@ mod tests {
         let acceptance_fraction = sampler.acceptance_fraction();
         assert!(acceptance_fraction.iter().sum::<f32>() / acceptance_fraction.len() as f32 > 0.25);
 
+        let mut invalid_walkers = Vec::new();
         for (i, fraction) in acceptance_fraction.iter().enumerate() {
-            assert!(*fraction > 0.0f32,
-                    "walker {} had a fraction value of {}",
-                    i,
-                    fraction);
+            if *fraction == 0.0f32 {
+                invalid_walkers.push((i, fraction));
+            }
         }
+        assert!(invalid_walkers.len() == 0,
+                "Found invalid walkers: {:?}",
+                invalid_walkers);
 
         // Check the chain
         let mut result = Guess { values: vec![0.0f32; sampler.dim] };
