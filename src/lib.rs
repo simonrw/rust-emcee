@@ -808,25 +808,47 @@ mod tests {
             .collect();
 
         let mut sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
-        sampler.seed(&[1, 2, 3, 4]);
-        sampler.run_mcmc(&p0, niter).unwrap();
+        sampler.seed(&[1]);
+        check_sampler(&mut sampler, niter, &p0);
+    }
+
+    // Test helper functions
+    fn check_sampler<'a, T: Prob + 'a>(sampler: &mut EnsembleSampler<'a, T>,
+                                       niter: usize,
+                                       p0: &[Guess]) {
+        let _ = sampler.run_mcmc(&p0, niter).unwrap();
+
         let chain = sampler.flatchain();
         let maxdiff = 1E-4;
 
-        let mut result = Guess { values: vec![0.0f32; ndim] };
+        // Check the acceptance fraction
+        let acceptance_fraction = sampler.acceptance_fraction();
+        assert!(acceptance_fraction.iter().sum::<f32>() / acceptance_fraction.len() as f32 > 0.25);
 
-        for i in 0..nwalkers * niter {
-            for j in 0..ndim {
+        for (i, fraction) in acceptance_fraction.iter().enumerate() {
+            assert!(*fraction > 0.0f32,
+                    "walker {} had a fraction value of {}",
+                    i,
+                    fraction);
+        }
+
+        // Check the chain
+        let mut result = Guess { values: vec![0.0f32; sampler.dim] };
+
+        for i in 0..sampler.nwalkers * niter {
+            for j in 0..sampler.dim {
                 result.values[j] += (chain[i].values[j] / niter as f32).powf(2.0);
             }
         }
 
         for value in result.values {
-            assert!((value / niter as f32).powf(2.0) < maxdiff, "value: {}, maxdiff: {}", value, maxdiff);
+            assert!((value / niter as f32).powf(2.0) < maxdiff,
+                    "value: {}, maxdiff: {}",
+                    value,
+                    maxdiff);
         }
     }
 
-    // Test helper functions
     fn create_guess() -> Guess {
         Guess { values: vec![0.0f32, 0.0f32] }
     }
