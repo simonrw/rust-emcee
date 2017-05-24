@@ -796,14 +796,15 @@ mod tests {
         let model = MultivariateProb { icov: &icov };
 
         let norm_range = Normal::new(0.0f64, 1.0f64);
+        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let p0: Vec<_> = (0..nwalkers)
             .map(|_| {
-                Guess {
-                    values: (0..ndim)
-                        .map(|_| 0.1f32 * norm_range.ind_sample(&mut rand::thread_rng()) as f32)
-                        .collect(),
-                }
-            })
+                     Guess {
+                         values: (0..ndim)
+                             .map(|_| 0.1f32 * norm_range.ind_sample(&mut rng) as f32)
+                             .collect(),
+                     }
+                 })
             .collect();
 
         let mut sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
