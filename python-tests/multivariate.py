@@ -28,7 +28,6 @@ def check_sampler(sampler, N, p0, mean, cov):
                   < maxdiff)
 
 
-
 if __name__ == '__main__':
     np.random.seed(42)
 
@@ -44,8 +43,9 @@ if __name__ == '__main__':
     cov = np.dot(cov, cov)
     icov = np.linalg.inv(cov)
     p0 = [0.1 * np.random.randn(ndim)
-                for i in range(nwalkers)]
+          for i in range(nwalkers)]
     truth = np.random.multivariate_normal(mean, cov, 100000)
 
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_gaussian, args=[icov, ])
+    sampler = emcee.EnsembleSampler(
+        nwalkers, ndim, lnprob_gaussian, args=[icov, ])
     check_sampler(sampler, N * nwalkers, p0, mean, cov)
