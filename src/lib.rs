@@ -755,11 +755,15 @@ mod tests {
                      266.44429402,
                      983.33032073]];
 
-        let guess = Guess::new(&[5., 5., 5., 5., 5.]);
-        let expected = -80374.206; // value as computed by Python
+        let guesses = &[Guess::new(&[5., 5., 5., 5., 5.]),
+                        Guess::new(&[5., 5., 5., 5., 9.]),
+                        Guess::new(&[5., 120., 5., 5., 9.])];
+        let expecteds = &[-80374.2068729, -138398.513797, -7902962.23125];
 
-        let p = MultivariateProb { icov: (&icov) };
-        assert_approx_eq!(p.lnprob(&guess), expected);
+        for (guess, expected) in guesses.iter().zip(expecteds) {
+            let p = MultivariateProb { icov: (&icov) };
+            assert_approx_eq!(p.lnprob(&guess), expected);
+        }
     }
 
     #[test]
