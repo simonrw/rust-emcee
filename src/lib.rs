@@ -346,6 +346,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         /* Loop state */
         let mut p = params.to_owned(); // Take a copy of the input vector so we can mutate it
         let mut lnprob = self.get_lnprob(params)?;
+        if lnprob.iter().any(|val| val.is_nan()) {
+            return Err("The initial lnprob was NaN.".into());
+        }
 
         let indices: Vec<usize> = (0..params.len()).collect();
         self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
