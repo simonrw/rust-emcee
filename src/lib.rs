@@ -361,8 +361,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             let to_iterate = &[(&first_half, &second_half), (&second_half, &first_half)];
             let i_iterate = &[(&first_i, &second_i), (&second_i, &first_i)];
 
-            let zipped = i_iterate.iter().zip(to_iterate);
-            for val in zipped {
+            for val in i_iterate.iter().zip(to_iterate) {
                 let &(I0, _) = val.0;
                 let &(S0, S1) = val.1;
 
@@ -377,12 +376,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                         }
 
                         let idx = I0[j]; // position in the parameter vector
-                        self.naccepted[idx] += 1;
                         assert!(idx < lnprob.len());
                         lnprob[idx] = stretch.newlnprob[j];
 
                         let new_values = stretch.q[j].values.clone();
-                        p[idx].values = new_values;
+                        p[idx] = Guess { values: new_values };
+
+                        self.naccepted[idx] += 1;
                     }
                 }
             }
@@ -440,31 +440,41 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
     // Internal functions
 
-    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f32]) -> Result<Stretch> {
+    fn propose_stretch(&mut self,
+                       p0: &[Guess],
+                       p1: &[Guess],
+                       lnprob0: &[f32])
+                       -> Result<Stretch> {
         assert_eq!(p0.len() + p1.len(), self.nwalkers);
-        let Ns = p0.len();
-        let Nc = p1.len();
+        let s = p0;
+        let c = p1;
+        let Ns = s.len();
+        let Nc = c.len();
 
-        let z_range = Range::new(1.0f32, 2.0f32);
+        // let z_range = Range::new(1.0f32, 2.0f32);
         let rint_range = Range::new(0usize, Nc);
         let unit_range = Range::new(0f32, 1f32);
 
         let a = 2.0f32;
         let zz: Vec<f32> = (0..Ns)
-            .map(|_| ((a - 1.0) * z_range.ind_sample(&mut self.rng)).powf(2.0f32) / 2.0f32)
+            .map(|_| {
+                     ((a - 1.0) * unit_range.ind_sample(&mut self.rng) + 1.0f32).powf(2.0f32) /
+                     2.0f32
+                 })
             .collect();
 
         let rint: Vec<usize> = (0..Ns)
             .map(|_| rint_range.ind_sample(&mut self.rng))
             .collect();
 
-        let mut q = Vec::new();
+        let mut q = Vec::with_capacity(Ns);
         for guess_i in 0..Ns {
             let mut values = Vec::with_capacity(self.dim);
             for param_i in 0..self.dim {
-                let guess_diff = p1[rint[guess_i]].values[param_i] - p0[guess_i].values[param_i];
-
-                let new_value = p1[rint[guess_i]].values[param_i] - zz[guess_i] * guess_diff;
+                let other_index = rint[guess_i];
+                let random_c = c[other_index][param_i];
+                let guess_diff = random_c - s[guess_i][param_i];
+                let new_value = random_c - zz[guess_i] * guess_diff;
                 values.push(new_value);
             }
             q.push(Guess { values });
@@ -478,10 +488,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         assert_eq!(out.newlnprob.len(), Ns);
 
         for i in 0..Ns {
-            let dim = p0[0].values.len() as f32;
             assert!(zz[i] > 0.);
-            let lnpdiff = (dim - 1.0) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
-            if lnpdiff > unit_range.ind_sample(&mut self.rng).ln() {
+            let lnpdiff = (self.dim as f32 - 1.0) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
+            let test_value = unit_range.ind_sample(&mut self.rng).ln();
+
+            if lnpdiff > test_value {
                 out.accept[i] = true;
             }
         }
@@ -489,7 +500,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f32>> {
-        let mut lnprobs = Vec::with_capacity(self.dim);
+        let mut lnprobs = Vec::with_capacity(p.len());
         for guess in p {
             if guess.contains_infs() {
                 return Err("At least one parameter value was infinite".into());
@@ -833,14 +844,30 @@ mod tests {
         assert!(acceptance_fraction.iter().sum::<f32>() / acceptance_fraction.len() as f32 > 0.25);
 
         let mut invalid_walkers = Vec::new();
+
+        // Small struct to add context to the invalid walker description
+        #[derive(Debug)]
+        struct I {
+            idx: usize,
+            fraction: f32,
+        }
+
         for (i, fraction) in acceptance_fraction.iter().enumerate() {
             if *fraction == 0.0f32 {
-                invalid_walkers.push((i, fraction));
+                invalid_walkers.push(I {
+                                         idx: i,
+                                         fraction: *fraction,
+                                     });
             }
         }
+
+        let split = acceptance_fraction.split_at(acceptance_fraction.len() / 2);
         assert!(invalid_walkers.len() == 0,
-                "Found invalid walkers: {:?}",
-                invalid_walkers);
+                "Found {} invalid walkers: {:?} (AF1: {:?}, AF2: {:?})",
+                invalid_walkers.len(),
+                invalid_walkers,
+                split.0,
+                split.1);
 
         // Check the chain
         let mut result = Guess { values: vec![0.0f32; sampler.dim] };
