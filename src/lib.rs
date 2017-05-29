@@ -354,8 +354,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
         self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
 
-        for iter in 0..iterations {
-            self.iterations = iter;
+        for _ in 0..iterations {
             let cloned = p.clone();
             let (first_half, second_half) = cloned.split_at(halfk);
             let (first_i, second_i) = indices.split_at(halfk);
@@ -404,6 +403,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 }
                 None => unreachable!(),
             }
+            self.iterations += 1;
         }
         Ok(())
     }
