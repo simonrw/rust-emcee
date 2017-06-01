@@ -82,7 +82,10 @@ impl ProbStore {
 
     pub fn set(&mut self, walker_idx: usize, iteration_idx: usize, value: f32) {
         assert!(walker_idx < self.nwalkers);
-        assert!(iteration_idx < self.niterations);
+        assert!(iteration_idx < self.niterations,
+                "iteration index {}, number of iterations required: {}",
+                iteration_idx,
+                self.niterations);
 
         let idx = self.index(walker_idx, iteration_idx);
 

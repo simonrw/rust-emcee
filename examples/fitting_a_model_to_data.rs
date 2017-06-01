@@ -69,9 +69,9 @@ fn main() {
             assert_eq!(self.x.len(), self.y.len());
             assert_eq!(self.y.len(), self.e.len());
 
-            let m = theta.values[0];
-            let b = theta.values[1];
-            let lnf = theta.values[2];
+            let m = theta[0];
+            let b = theta[1];
+            let lnf = theta[2];
 
             let mut result = 0.;
             for i in 0..self.x.len() {
@@ -86,9 +86,9 @@ fn main() {
         fn lnprior(&self, theta: &Guess) -> f32 {
             assert_eq!(theta.values.len(), 3);
 
-            let m = theta.values[0];
-            let b = theta.values[1];
-            let lnf = theta.values[2];
+            let m = theta[0];
+            let b = theta[1];
+            let lnf = theta[2];
 
             if (m > -5.0) && (m < 5.0) && (b > 0.0) && (b < 10.0) && (lnf > -10.0) && (lnf < 1.0) {
                 0.
@@ -125,11 +125,7 @@ fn main() {
             continue;
         }
 
-        write!(&mut writer,
-               "{} {} {}\n",
-               guess.values[0],
-               guess.values[1],
-               guess.values[2])
-                .expect("writing output line");
+        write!(&mut writer, "{} {} {}\n", guess[0], guess[1], guess[2])
+            .expect("writing output line");
     }
 }

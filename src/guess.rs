@@ -10,6 +10,20 @@ pub struct Guess {
     pub values: Vec<f32>,
 }
 
+impl ::std::ops::Index<usize> for Guess {
+    type Output = f32;
+
+    fn index(&self, idx: usize) -> &Self::Output {
+        &self.values[idx]
+    }
+}
+
+impl ::std::ops::IndexMut<usize> for Guess {
+    fn index_mut(&mut self, idx: usize) -> &mut f32 {
+        &mut self.values[idx]
+    }
+}
+
 impl Guess {
     /// Create a guess from a slice
     pub fn new(values: &[f32]) -> Self {
@@ -79,8 +93,8 @@ mod tests {
         let guess = Guess::new(&[1.0f32, 2.0f32]);
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let perturbed = guess.perturb_with_rng(&mut rng);
-        assert!(perturbed.values[0] != 1.0f32);
-        assert!(perturbed.values[1] != 2.0f32);
+        assert!(perturbed[0] != 1.0f32);
+        assert!(perturbed[1] != 2.0f32);
     }
 
     #[test]
@@ -106,5 +120,14 @@ mod tests {
 
         let guess = Guess::new(&[0f32]);
         assert!(!guess.contains_nans());
+    }
+
+    #[test]
+    fn test_indexing() {
+        let mut guess = Guess::new(&[1., 2., 3., 4.]);
+        assert_approx_eq!(guess[1], 2.0);
+
+        guess[2] = 15.0;
+        assert_eq!(guess[2], 15.0);
     }
 }

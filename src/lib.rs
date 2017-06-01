@@ -53,8 +53,8 @@
 //! // Linear model y = m * x + c
 //! impl<'a> Prob for Model<'a> {
 //!     fn lnlike(&self, params: &Guess) -> f32 {
-//!         let m = params.values[0];
-//!         let c = params.values[1];
+//!         let m = params[0];
+//!         let c = params[1];
 //!
 //!         -0.5 * self.x.iter().zip(self.y)
 //!             .map(|(xval, yval)| {
@@ -119,8 +119,8 @@
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
 //! #     fn lnlike(&self, params: &Guess) -> f32 {
-//! #         let m = params.values[0];
-//! #         let c = params.values[1];
+//! #         let m = params[0];
+//! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
 //! #             .map(|(xval, yval)| {
 //! #                 let model = m * xval + c;
@@ -159,8 +159,8 @@
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
 //! #     fn lnlike(&self, params: &Guess) -> f32 {
-//! #         let m = params.values[0];
-//! #         let c = params.values[1];
+//! #         let m = params[0];
+//! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
 //! #             .map(|(xval, yval)| {
 //! #                 let model = m * xval + c;
@@ -207,8 +207,8 @@
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
 //! #     fn lnlike(&self, params: &Guess) -> f32 {
-//! #         let m = params.values[0];
-//! #         let c = params.values[1];
+//! #         let m = params[0];
+//! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
 //! #             .map(|(xval, yval)| {
 //! #                 let model = m * xval + c;
@@ -245,7 +245,7 @@
 //!         continue;
 //!     }
 //!
-//!     println!("Iteration {}; m={}, c={}", i, guess.values[0], guess.values[1]);
+//!     println!("Iteration {}; m={}, c={}", i, guess[0], guess[1]);
 //! }
 //! ```
 //!
@@ -289,7 +289,7 @@ use stores::{Chain, ProbStore};
 /// Affine-invariant Markov-chain Monte Carlo sampler
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
-    naccepted: usize,
+    naccepted: Vec<usize>,
     iterations: usize,
     lnprob: &'a T,
     dim: usize,
@@ -323,7 +323,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                iterations: 0,
                lnprob: lnprob,
                dim: dim,
-               naccepted: 0,
+               naccepted: vec![0; nwalkers],
                rng: Box::new(rand::thread_rng()),
                chain: None,
                probstore: None,
@@ -341,66 +341,77 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
+        // Take a copy of the params vector to mutate
+        let mut lnprob = self.get_lnprob(params)?;
+        let mut p = params.to_owned();
         let halfk = self.nwalkers / 2;
 
-        /* Loop state */
-        let mut p = params.to_owned(); // Take a copy of the input vector so we can mutate it
-        let mut lnprob = self.get_lnprob(params)?;
+        if lnprob.iter().any(|val| val.is_nan()) {
+            return Err("The initial lnprob was NaN.".into());
+        }
 
-        let indices: Vec<usize> = (0..params.len()).collect();
         self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
         self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
 
-        for iter in 0..iterations {
-            self.iterations = iter;;
-            let cloned = p.clone();
-            let (first_half, second_half) = cloned.split_at(halfk);
-            let (first_i, second_i) = indices.split_at(halfk);
-            let to_iterate = &[(&first_half, &second_half), (&second_half, &first_half)];
-            let i_iterate = &[(&first_i, &second_i), (&second_i, &first_i)];
+        for iteration in 0..iterations {
 
-            let zipped = i_iterate.iter().zip(to_iterate);
-            for val in zipped {
-                let &(I0, _) = val.0;
-                let &(S0, S1) = val.1;
+            for ensemble_idx in 0..2 {
+                let (first, second) = if ensemble_idx == 0 {
+                    p.split_at_mut(halfk)
+                } else {
+                    let (second, first) = p.split_at_mut(halfk);
+                    (first, second)
+                };
 
-                let stretch = self.propose_stretch(S0, S1, &lnprob);
+                let (lnprob_slice, _) = if ensemble_idx == 0 {
+                    lnprob.split_at_mut(halfk)
+                } else {
+                    let (second, first) = lnprob.split_at_mut(halfk);
+                    (first, second)
+                };
+
+                assert_eq!(first.len(), halfk);
+                assert_eq!(second.len(), halfk);
+                assert_eq!(lnprob_slice.len(), halfk);
+
+                let stretch = self.propose_stretch(&first, &second, &lnprob_slice)?;
 
                 if stretch.accept.iter().any(|val| *val) {
-                    /* Update the positions, log probabilities and acceptance counts */
-                    assert_eq!(I0.len(), stretch.accept.len());
-                    for j in 0..stretch.accept.len() {
-                        if !stretch.accept[j] {
+                    /* Some walkers have accepted new positions, so update the store variables */
+                    for walker_idx in 0..halfk {
+                        if !stretch.accept[walker_idx] {
                             continue;
                         }
 
-                        let idx = I0[j]; // position in the parameter vector
-                        assert!(idx < lnprob.len());
-                        lnprob[idx] = stretch.newlnprob[j];
-
-                        let new_values = stretch.q[j].values.clone();
-                        p[idx].values = new_values;
+                        lnprob_slice[walker_idx] = stretch.newlnprob[walker_idx];
+                        /* Update the param vector values */
+                        for (param_idx, param) in stretch.q[walker_idx].values.iter().enumerate() {
+                            first[walker_idx][param_idx] = *param;
+                        }
+                        let real_walker_idx = walker_idx + ensemble_idx * halfk;
+                        self.naccepted[real_walker_idx] += 1;
                     }
                 }
             }
 
-            // Update the internal chain object
-            for (idx, guess) in p.iter().enumerate() {
+            /* Update the store variables with the new parameter values */
+            for walker_idx in 0..self.nwalkers {
                 match self.chain {
                     Some(ref mut chain) => {
-                        chain.set_params(idx, self.iterations, &guess.values);
+                        chain.set_params(walker_idx, iteration, &p[walker_idx].values)
                     }
+                    None => unreachable!(),
+                }
+
+                match self.probstore {
+                    Some(ref mut probstore) => probstore.set_probs(iteration, &lnprob),
                     None => unreachable!(),
                 }
             }
 
-            match self.probstore {
-                Some(ref mut store) => {
-                    store.set_probs(self.iterations, &lnprob);
-                }
-                None => unreachable!(),
-            }
+            self.iterations += 1;
         }
+
         Ok(())
     }
 
@@ -420,38 +431,53 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         }
     }
 
+    /// Return the number of iterations accepted, one value per walker
+    pub fn acceptance_fraction(&self) -> Vec<f32> {
+        self.naccepted
+            .iter()
+            .map(|naccepted| *naccepted as f32 / self.iterations as f32)
+            .collect()
+    }
+
     /// Return the sampler to its default state
     pub fn reset(&mut self) {
         self.iterations = 0;
-        self.naccepted = 0;
+        self.naccepted.resize(0, 0);
     }
 
     // Internal functions
 
-    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f32]) -> Stretch {
-        let Ns = p0.len();
-        let Nc = p1.len();
+    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f32]) -> Result<Stretch> {
+        assert_eq!(p0.len() + p1.len(), self.nwalkers);
+        let s = p0;
+        let c = p1;
+        let Ns = s.len();
+        let Nc = c.len();
 
-        let z_range = Range::new(1.0f32, 2.0f32);
+        // let z_range = Range::new(1.0f32, 2.0f32);
         let rint_range = Range::new(0usize, Nc);
         let unit_range = Range::new(0f32, 1f32);
 
         let a = 2.0f32;
         let zz: Vec<f32> = (0..Ns)
-            .map(|_| ((a - 1.0) * z_range.ind_sample(&mut self.rng)).powf(2.0f32) / 2.0f32)
+            .map(|_| {
+                     ((a - 1.0) * unit_range.ind_sample(&mut self.rng) + 1.0f32).powf(2.0f32) /
+                     2.0f32
+                 })
             .collect();
 
         let rint: Vec<usize> = (0..Ns)
             .map(|_| rint_range.ind_sample(&mut self.rng))
             .collect();
 
-        let mut q = Vec::new();
+        let mut q = Vec::with_capacity(Ns);
         for guess_i in 0..Ns {
             let mut values = Vec::with_capacity(self.dim);
             for param_i in 0..self.dim {
-                let guess_diff = p1[rint[guess_i]].values[param_i] - p0[guess_i].values[param_i];
-
-                let new_value = p1[rint[guess_i]].values[param_i] - zz[guess_i] * guess_diff;
+                let other_index = rint[guess_i];
+                let random_c = c[other_index][param_i];
+                let guess_diff = random_c - s[guess_i][param_i];
+                let new_value = random_c - zz[guess_i] * guess_diff;
                 values.push(new_value);
             }
             q.push(Guess { values });
@@ -459,18 +485,21 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         assert_eq!(q.len(), zz.len());
 
         let mut out = Stretch::preallocated_accept(Ns);
-        out.newlnprob = self.get_lnprob(&q).unwrap();
+        out.newlnprob = self.get_lnprob(&q)?;
         out.q = q;
 
+        assert_eq!(out.newlnprob.len(), Ns);
+
         for i in 0..Ns {
-            let dim = p0[0].values.len();
-            let lnpdiff = ((dim - 1) as f32) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
-            if lnpdiff > unit_range.ind_sample(&mut self.rng).ln() {
+            assert!(zz[i] > 0.);
+            let lnpdiff = (self.dim as f32 - 1.0) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
+            let test_value = unit_range.ind_sample(&mut self.rng).ln();
+
+            if lnpdiff > test_value {
                 out.accept[i] = true;
             }
         }
-
-        out
+        Ok(out)
     }
 
     fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f32>> {
@@ -485,9 +514,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             let result = self.lnprob.lnprob(guess);
             if result.is_nan() {
                 return Err("NaN value of lnprob".into());
-            } else {
-                lnprobs.push(result);
             }
+
+            lnprobs.push(result);
         }
 
         Ok(lnprobs)
@@ -496,7 +525,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
 #[cfg(test)]
 mod tests {
-
+    use rand::distributions::Normal;
     use super::*;
 
     const REAL_M: f32 = 2.0f32;
@@ -519,8 +548,8 @@ mod tests {
         }
 
         fn lnlike(&self, params: &Guess) -> f32 {
-            let m = params.values[0];
-            let c = params.values[1];
+            let m = params[0];
+            let c = params[1];
             let sum = self.x
                 .iter()
                 .zip(self.y)
@@ -532,6 +561,31 @@ mod tests {
             -sum
         }
     }
+
+
+    struct MultivariateProb<'a> {
+        icov: &'a [[f32; 5]; 5],
+    }
+
+    impl<'a> Prob for MultivariateProb<'a> {
+        // Stub methods as they are not used
+        fn lnlike(&self, _params: &Guess) -> f32 {
+            0.0f32
+        }
+        fn lnprior(&self, _params: &Guess) -> f32 {
+            0.0f32
+        }
+
+        fn lnprob(&self, params: &Guess) -> f32 {
+            let mut values = [0f32; 5];
+            for (i, value) in params.values.iter().enumerate() {
+                values[i] = *value;
+            }
+            let inv_prod = mat_vec_mul(&self.icov, &values);
+            -vec_vec_mul(&values, &inv_prod) / 2.0
+        }
+    }
+
 
     #[test]
     fn test_single_sample() {
@@ -631,7 +685,7 @@ mod tests {
         assert_eq!(b.len(), nwalkers / 2);
 
         let lnprob = sampler.get_lnprob(&pos).unwrap();
-        let _stretch = sampler.propose_stretch(&a, &b, &lnprob);
+        let _stretch = sampler.propose_stretch(&a, &b, &lnprob).unwrap();
     }
 
     #[test]
@@ -645,12 +699,12 @@ mod tests {
 
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
-        sampler.seed(&[1]);
+        sampler.seed(&[0]);
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
 
         if let Some(ref chain) = sampler.chain {
             /* Wide margins due to random numbers :( */
-            assert_approx_eq!(chain.get(0, 0, niters - 2), 2.0f32, 0.03f32);
+            assert_approx_eq!(chain.get(0, 0, niters - 2), 2.0f32, 0.04f32);
             assert_approx_eq!(chain.get(1, 0, niters - 2), 5.0f32, 0.4f32);
         }
     }
@@ -690,32 +744,47 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    fn test_lnprob_gaussian() {
+        // Testing the probability model for the multivariate test
+        let icov = [[318.92634269,
+                     531.39511426,
+                     -136.10315845,
+                     154.17685545,
+                     552.308813],
+                    [531.39511426,
+                     899.91793286,
+                     -224.74333441,
+                     258.98686842,
+                     938.32014715],
+                    [-136.10315845,
+                     -224.74333441,
+                     60.61145495,
+                     -66.68898448,
+                     -232.52035701],
+                    [154.17685545,
+                     258.98686842,
+                     -66.68898448,
+                     83.9979827,
+                     266.44429402],
+                    [552.308813,
+                     938.32014715,
+                     -232.52035701,
+                     266.44429402,
+                     983.33032073]];
+
+        let guesses = &[Guess::new(&[5., 5., 5., 5., 5.]),
+                        Guess::new(&[5., 5., 5., 5., 9.]),
+                        Guess::new(&[5., 120., 5., 5., 9.])];
+        let expecteds = &[-80374.2068729, -138398.513797, -7902962.23125];
+
+        for (guess, expected) in guesses.iter().zip(expecteds) {
+            let p = MultivariateProb { icov: (&icov) };
+            assert_approx_eq!(p.lnprob(&guess), expected);
+        }
+    }
+
+    #[test]
     fn test_multivariate() {
-        use rand::distributions::Normal;
-        struct Foo<'a> {
-            icov: &'a [[f32; 5]; 5],
-        }
-
-        impl<'a> Prob for Foo<'a> {
-            // Stub methods as they are not used
-            fn lnlike(&self, _params: &Guess) -> f32 {
-                0.0f32
-            }
-            fn lnprior(&self, _params: &Guess) -> f32 {
-                0.0f32
-            }
-
-            fn lnprob(&self, params: &Guess) -> f32 {
-                let mut values = [0f32; 5];
-                for (i, value) in params.values.iter().enumerate() {
-                    values[i] = *value;
-                }
-                let inv_prod = mat_vec_mul(&self.icov, &values);
-                -vec_vec_mul(&values, &inv_prod) / 2.0
-            }
-        }
-
         let nwalkers = 100;
         let ndim = 5;
         let niter = 1000;
@@ -745,39 +814,81 @@ mod tests {
                      -232.52035701,
                      266.44429402,
                      983.33032073]];
-        let model = Foo { icov: &icov };
+        let model = MultivariateProb { icov: &icov };
 
         let norm_range = Normal::new(0.0f64, 1.0f64);
+        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let p0: Vec<_> = (0..nwalkers)
             .map(|_| {
-                Guess {
-                    values: (0..ndim)
-                        .map(|_| 0.1f32 * norm_range.ind_sample(&mut rand::thread_rng()) as f32)
-                        .collect(),
-                }
-            })
+                     Guess {
+                         values: (0..ndim)
+                             .map(|_| 0.1f32 * norm_range.ind_sample(&mut rng) as f32)
+                             .collect(),
+                     }
+                 })
             .collect();
 
         let mut sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
-        sampler.seed(&[1, 2, 3, 4]);
-        sampler.run_mcmc(&p0, niter).unwrap();
+        sampler.seed(&[1]);
+        check_sampler(&mut sampler, niter, &p0);
+    }
+
+    // Test helper functions
+    fn check_sampler<'a, T: Prob + 'a>(sampler: &mut EnsembleSampler<'a, T>,
+                                       niter: usize,
+                                       p0: &[Guess]) {
+        let _ = sampler.run_mcmc(&p0, niter).unwrap();
+
         let chain = sampler.flatchain();
         let maxdiff = 1E-4;
 
-        let mut result = Guess { values: vec![0.0f32; ndim] };
+        // Check the acceptance fraction
+        let acceptance_fraction = sampler.acceptance_fraction();
+        assert!(acceptance_fraction.iter().sum::<f32>() / acceptance_fraction.len() as f32 > 0.25);
 
-        for i in 0..nwalkers * niter {
-            for j in 0..ndim {
-                result.values[j] += (chain[i].values[j] / niter as f32).powf(2.0);
+        let mut invalid_walkers = Vec::new();
+
+        // Small struct to add context to the invalid walker description
+        #[derive(Debug)]
+        struct I {
+            idx: usize,
+            fraction: f32,
+        }
+
+        for (i, fraction) in acceptance_fraction.iter().enumerate() {
+            if *fraction == 0.0f32 {
+                invalid_walkers.push(I {
+                                         idx: i,
+                                         fraction: *fraction,
+                                     });
+            }
+        }
+
+        let split = acceptance_fraction.split_at(acceptance_fraction.len() / 2);
+        assert!(invalid_walkers.len() == 0,
+                "Found {} invalid walkers: {:?} (AF1: {:?}, AF2: {:?})",
+                invalid_walkers.len(),
+                invalid_walkers,
+                split.0,
+                split.1);
+
+        // Check the chain
+        let mut result = Guess { values: vec![0.0f32; sampler.dim] };
+
+        for i in 0..sampler.nwalkers * niter {
+            for j in 0..sampler.dim {
+                result[j] += (chain[i][j] / niter as f32).powf(2.0);
             }
         }
 
         for value in result.values {
-            assert!(value < maxdiff, "value: {}, maxdiff: {}", value, maxdiff);
+            assert!((value / niter as f32).powf(2.0) < maxdiff,
+                    "value: {}, maxdiff: {}",
+                    value,
+                    maxdiff);
         }
     }
 
-    // Test helper functions
     fn create_guess() -> Guess {
         Guess { values: vec![0.0f32, 0.0f32] }
     }
