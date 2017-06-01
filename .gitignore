@@ -3,3 +3,4 @@ target/
 Cargo.lock
 launch.json
 .vscode
+line-*.png
