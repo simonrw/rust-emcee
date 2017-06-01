@@ -10,6 +10,7 @@ extern crate rand;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use rand::distributions::{Range, Normal, IndependentSample};
+use rand::{StdRng, SeedableRng};
 
 use emcee::{Guess, Prob};
 
@@ -47,7 +48,7 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f32; 3]> {
 fn main() {
 
     /* Pre-generate rng and distributions */
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::from_seed(&[42]);
     let unit_range = Range::new(0f32, 1f32);
     let norm_gen = Normal::new(0.0, 1.0);
 
@@ -140,10 +141,11 @@ fn main() {
      */
     let ndim = 3;
     let nwalkers = 100;
-    let pos = guess.create_initial_guess(nwalkers);
+    let pos = guess.create_initial_guess_with_rng(nwalkers, &mut rng);
 
     let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
         .expect("creating sampler");
+    sampler.seed(&[42]);
     sampler.run_mcmc(&pos, 500).unwrap();
 
     let flatchain = sampler.flatchain();
