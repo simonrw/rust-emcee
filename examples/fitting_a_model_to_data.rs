@@ -83,7 +83,7 @@ fn main() {
      * Shortcut the least squares minimisation by starting the sampling
      * from the values found in the documentation
      */
-    let guess = Guess::new(&[-1.003, 4.528, 0.454]);
+    let guess = Guess::new(&[-1.003, 4.528, 0.454f32.ln()]);
 
     /*
      * Define the equivalent of lnprior, lnlike and lnprob (note: lnprob is automatically
@@ -166,7 +166,7 @@ fn main() {
 
     print_marginalised("m", &marginalised_posteriors[0], m_true);
     print_marginalised("b", &marginalised_posteriors[1], b_true);
-    print_marginalised("lnf", &marginalised_posteriors[2], f_true);
+    print_marginalised("lnf", &marginalised_posteriors[2], f_true.ln());
 }
 
 fn print_marginalised(name: &str, values: &[f32], truth: f32) {
