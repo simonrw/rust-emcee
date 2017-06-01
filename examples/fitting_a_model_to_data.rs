@@ -13,6 +13,37 @@ use rand::distributions::{Range, Normal, IndependentSample};
 
 use emcee::{Guess, Prob};
 
+fn sort(data: &mut Vec<f32>) {
+    data.sort_by(|a, b| a.partial_cmp(b).unwrap());
+}
+
+fn compute_quantiles(chain: &[Guess]) -> Vec<[f32; 3]> {
+    let nparams = chain[0].values.len();
+    let niterations = chain.len();
+    let mut param_vecs: Vec<Vec<f32>> = vec![Vec::with_capacity(chain.len()); nparams];
+    for guess in chain {
+        for param in 0..nparams {
+            param_vecs[param].push(guess.values[param]);
+        }
+    }
+
+    let mut out = Vec::with_capacity(nparams);
+    let lower_idx = (0.16 * niterations as f32) as usize;
+    let med_idx = (0.5 * niterations as f32) as usize;
+    let upper_idx = (0.84 * niterations as f32) as usize;
+
+    for param in 0..nparams {
+        sort(&mut param_vecs[param]);
+
+        let med = param_vecs[param][med_idx];
+        let lower = param_vecs[param][lower_idx];
+        let upper = param_vecs[param][upper_idx];
+        let res = [lower, med, upper];
+        out.push(res);
+    }
+    out
+}
+
 fn main() {
 
     /* Pre-generate rng and distributions */
@@ -128,4 +159,19 @@ fn main() {
         write!(&mut writer, "{} {} {}\n", guess[0], guess[1], guess[2])
             .expect("writing output line");
     }
+
+    let marginalised_posteriors = compute_quantiles(&flatchain);
+
+    print_marginalised("m", &marginalised_posteriors[0], m_true);
+    print_marginalised("b", &marginalised_posteriors[1], b_true);
+    print_marginalised("lnf", &marginalised_posteriors[2], f_true);
+}
+
+fn print_marginalised(name: &str, values: &[f32], truth: f32) {
+    println!("{:3} = {:6.3} +{:.3} -{:.3} (truth: {:6.3})",
+             name,
+             values[1],
+             values[1] - values[0],
+             values[2] - values[1],
+             truth);
 }
