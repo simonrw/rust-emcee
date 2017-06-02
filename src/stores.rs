@@ -51,10 +51,10 @@ impl Chain {
         let mut buffer = vec![0f32; self.nparams];
         for iter in 0..self.niterations {
             for walker in 0..self.nwalkers {
-                for i in 0..self.nparams {
-                    buffer[i] = self.get(i, walker, iter);
-                    out.push(Guess { values: buffer.clone() });
+                for (i, value) in buffer.iter_mut().enumerate() {
+                    *value = self.get(i, walker, iter);
                 }
+                out.push(Guess { values: buffer.clone() });
             }
         }
         out
