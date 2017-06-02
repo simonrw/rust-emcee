@@ -377,7 +377,12 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     proposal_scale: f32,
     chain: Option<Chain>,
     probstore: Option<ProbStore>,
+
+    /// Allow disabling of storing the chain
     storechain: bool,
+
+    /// Thin the stored chains by this much
+    pub thin: usize,
 }
 
 impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
@@ -411,6 +416,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                chain: None,
                probstore: None,
                storechain: true,
+               thin: 1,
            })
     }
 
@@ -422,11 +428,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// accepts.
     pub fn seed(&mut self, seed: &[usize]) {
         self.rng = Box::new(StdRng::from_seed(seed));
-    }
-
-    /// Disable storing the chain
-    pub fn disable_store(&mut self) {
-        self.storechain = false;
     }
 
     /// Run the sampler with a callback called on each iteration
@@ -450,8 +451,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         }
 
         if self.storechain {
-            self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
-            self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
+            let niterations = iterations / self.thin;
+            self.chain = Some(Chain::new(self.dim, self.nwalkers, niterations));
+            self.probstore = Some(ProbStore::new(self.nwalkers, niterations));
         }
 
         for iteration in 0..iterations {
@@ -496,13 +498,16 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             }
 
             /* Update the store variables with the new parameter values */
-            for (walker_idx, p_value) in p.iter().enumerate() {
-                if let Some(ref mut chain) = self.chain {
-                    chain.set_params(walker_idx, iteration, &p_value.values);
-                }
+            if iteration % self.thin == 0 {
+                let iteration = iteration / self.thin;
+                for (walker_idx, p_value) in p.iter().enumerate() {
+                    if let Some(ref mut chain) = self.chain {
+                        chain.set_params(walker_idx, iteration, &p_value.values);
+                    }
 
-                if let Some(ref mut probstore) = self.probstore {
-                    probstore.set_probs(iteration, &lnprob);
+                    if let Some(ref mut probstore) = self.probstore {
+                        probstore.set_probs(iteration, &lnprob);
+                    }
                 }
             }
 
@@ -913,9 +918,26 @@ mod tests {
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
         sampler.seed(&[0]);
-        sampler.disable_store();
+        sampler.storechain = false;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
         assert!(sampler.chain.is_none());
+    }
+
+    #[test]
+    fn test_thinning() {
+        let nwalkers = 20;
+        let p0 = Guess { values: vec![0f32, 0f32] };
+        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+
+        let niters = 1000;
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
+        sampler.seed(&[0]);
+        sampler.thin = 500;
+        let _ = sampler.run_mcmc(&pos, niters).unwrap();
+        assert_eq!(sampler.chain.unwrap().niterations, 2);
     }
 
     #[test]
