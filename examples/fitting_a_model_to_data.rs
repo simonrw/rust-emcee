@@ -23,8 +23,8 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f32; 3]> {
     let niterations = chain.len();
     let mut param_vecs: Vec<Vec<f32>> = vec![Vec::with_capacity(chain.len()); nparams];
     for guess in chain {
-        for param in 0..nparams {
-            param_vecs[param].push(guess.values[param]);
+        for (param, value) in guess.values.iter().enumerate() {
+            param_vecs[param].push(*value);
         }
     }
 
@@ -33,12 +33,12 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f32; 3]> {
     let med_idx = (0.5 * niterations as f32) as usize;
     let upper_idx = (0.84 * niterations as f32) as usize;
 
-    for param in 0..nparams {
-        sort(&mut param_vecs[param]);
+    for mut v in &mut param_vecs {
+        sort(&mut v);
 
-        let med = param_vecs[param][med_idx];
-        let lower = param_vecs[param][lower_idx];
-        let upper = param_vecs[param][upper_idx];
+        let med = v[med_idx];
+        let lower = v[lower_idx];
+        let upper = v[upper_idx];
         let res = [lower, med, upper];
         out.push(res);
     }

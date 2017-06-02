@@ -29,7 +29,7 @@ mod benchmarks {
             for (i, value) in params.values.iter().enumerate() {
                 values[i] = *value;
             }
-            let inv_prod = mat_vec_mul(&self.icov, &values);
+            let inv_prod = mat_vec_mul(self.icov, &values);
             -vec_vec_mul(&values, &inv_prod) / 2.0
         }
     }

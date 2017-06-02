@@ -10,7 +10,7 @@
 //! If you make use of emcee in your work, please cite Dan's paper
 //! ([arXiv](http://arxiv.org/abs/1202.3665),
 //! [ADS](http://adsabs.harvard.edu/abs/2013PASP..125..306F),
-//! [BibTeX]
+//! [`BibTeX`]
 //! (http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2013PASP..125..306F&data_type=BIBTEX)).
 //!
 //! ## Basic usage
@@ -466,7 +466,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 assert_eq!(second.len(), halfk);
                 assert_eq!(lnprob_slice.len(), halfk);
 
-                let stretch = self.propose_stretch(&first, &second, &lnprob_slice)?;
+                let stretch = self.propose_stretch(first, second, lnprob_slice)?;
 
                 if stretch.accept.iter().any(|val| *val) {
                     /* Some walkers have accepted new positions, so update the store variables */
@@ -487,11 +487,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             }
 
             /* Update the store variables with the new parameter values */
-            for walker_idx in 0..self.nwalkers {
+            for (walker_idx, p_value) in p.iter().enumerate() {
                 match self.chain {
-                    Some(ref mut chain) => {
-                        chain.set_params(walker_idx, iteration, &p[walker_idx].values)
-                    }
+                    Some(ref mut chain) => chain.set_params(walker_idx, iteration, &p_value.values),
                     None => unreachable!(),
                 }
 
@@ -560,16 +558,16 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
         let mut q = Vec::with_capacity(ns);
         let mut all_zz = Vec::with_capacity(ns);
-        for guess_i in 0..ns {
+        for sval in s {
             let zz = ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) +
                       1.0f32)
                     .powf(2.0f32) / self.proposal_scale;
             let rint = rint_range.ind_sample(&mut self.rng);
 
             let mut values = Vec::with_capacity(self.dim);
-            for param_i in 0..self.dim {
+            for (param_i, s_param) in sval.values.iter().enumerate() {
                 let random_c = c[rint][param_i];
-                let guess_diff = random_c - s[guess_i][param_i];
+                let guess_diff = random_c - s_param;
                 let new_value = random_c - zz * guess_diff;
                 values.push(new_value);
             }
