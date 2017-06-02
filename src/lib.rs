@@ -244,6 +244,7 @@
 //! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
 //! # let niterations = 100;
 //! sampler.sample(&perturbed_guess, niterations, |step| {
+//!     println!("Current iteration: {}", step.iteration);
 //!     println!("Current guess vectors: {:?}", step.pos);
 //!     println!("Current log posterior probabilities: {:?}", step.lnprob);
 //! });
@@ -360,6 +361,9 @@ pub struct Step<'a> {
 
     /// The log posterior probabilities of the values contained in `pos`, one for each walker
     pub lnprob: &'a [f32],
+
+    /// The current iteration number
+    pub iteration: usize,
 }
 
 /// Affine-invariant Markov-chain Monte Carlo sampler
@@ -498,6 +502,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             let step = Step {
                 pos: &p,
                 lnprob: &lnprob,
+                iteration: iteration,
             };
 
             callback(step);

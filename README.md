@@ -146,6 +146,7 @@ example:
 
 ```rust
 sampler.sample(&perturbed_guess, niterations, |step| {
+    println!("Current iteration: {}", step.iteration);
     println!("Current guess vectors: {:?}", step.pos);
     println!("Current log posterior probabilities: {:?}", step.lnprob);
 });
