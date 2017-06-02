@@ -296,7 +296,7 @@
 //! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
 //! # let niterations = 100;
 //! # sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
-//! let flatchain = sampler.flatchain();
+//! let flatchain = sampler.flatchain().unwrap();
 //!
 //! for (i, guess) in flatchain.iter().enumerate() {
 //!     // Skip possible "burn-in" phase
@@ -377,6 +377,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     proposal_scale: f32,
     chain: Option<Chain>,
     probstore: Option<ProbStore>,
+    storechain: bool,
 }
 
 impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
@@ -409,6 +410,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                proposal_scale: 2.0,
                chain: None,
                probstore: None,
+               storechain: true,
            })
     }
 
@@ -420,6 +422,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// accepts.
     pub fn seed(&mut self, seed: &[usize]) {
         self.rng = Box::new(StdRng::from_seed(seed));
+    }
+
+    /// Disable storing the chain
+    pub fn disable_store(&mut self) {
+        self.storechain = false;
     }
 
     /// Run the sampler with a callback called on each iteration
@@ -442,8 +449,10 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             return Err("The initial lnprob was NaN.".into());
         }
 
-        self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
-        self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
+        if self.storechain {
+            self.chain = Some(Chain::new(self.dim, self.nwalkers, iterations));
+            self.probstore = Some(ProbStore::new(self.nwalkers, iterations));
+        }
 
         for iteration in 0..iterations {
 
@@ -488,14 +497,12 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
             /* Update the store variables with the new parameter values */
             for (walker_idx, p_value) in p.iter().enumerate() {
-                match self.chain {
-                    Some(ref mut chain) => chain.set_params(walker_idx, iteration, &p_value.values),
-                    None => unreachable!(),
+                if let Some(ref mut chain) = self.chain {
+                    chain.set_params(walker_idx, iteration, &p_value.values);
                 }
 
-                match self.probstore {
-                    Some(ref mut probstore) => probstore.set_probs(iteration, &lnprob),
-                    None => unreachable!(),
+                if let Some(ref mut probstore) = self.probstore {
+                    probstore.set_probs(iteration, &lnprob);
                 }
             }
 
@@ -522,10 +529,10 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     /// Return the samples as computed by the sampler
-    pub fn flatchain(&self) -> Vec<Guess> {
+    pub fn flatchain(&self) -> Option<Vec<Guess>> {
         match self.chain {
-            Some(ref chain) => chain.flatchain(),
-            None => unreachable!(),
+            Some(ref chain) => Some(chain.flatchain()),
+            None => None,
         }
     }
 
@@ -895,6 +902,23 @@ mod tests {
     }
 
     #[test]
+    fn test_not_storing_chain() {
+        let nwalkers = 20;
+        let p0 = Guess { values: vec![0f32, 0f32] };
+        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
+        let (real_x, observed_y) = load_baked_dataset();
+        let foo = LinearModel::new(&real_x, &observed_y);
+
+        let niters = 1000;
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
+        sampler.seed(&[0]);
+        sampler.disable_store();
+        let _ = sampler.run_mcmc(&pos, niters).unwrap();
+        assert!(sampler.chain.is_none());
+    }
+
+    #[test]
     fn test_multivariate() {
         let nwalkers = 100;
         let ndim = 5;
@@ -950,7 +974,7 @@ mod tests {
                                        p0: &[Guess]) {
         let _ = sampler.run_mcmc(&p0, niter).unwrap();
 
-        let chain = sampler.flatchain();
+        let chain = sampler.flatchain().unwrap();
         let maxdiff = 1E-4;
 
         // Check the acceptance fraction
