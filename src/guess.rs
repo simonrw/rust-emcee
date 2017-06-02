@@ -7,6 +7,7 @@ use rand::distributions::{Normal, IndependentSample};
 /// numbers, and are contained in a [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html).
 #[derive(Debug, Clone)]
 pub struct Guess {
+    /// A position in parameter space
     pub values: Vec<f32>,
 }
 
@@ -52,10 +53,12 @@ impl Guess {
             .collect()
     }
 
+    /// Returns if the guess vector contains infinite values
     pub fn contains_infs(&self) -> bool {
         self.values.iter().any(|val| val.is_infinite())
     }
 
+    /// Returns if the guess vector contains NaN values
     pub fn contains_nans(&self) -> bool {
         self.values.iter().any(|val| val.is_nan())
     }

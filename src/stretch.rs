@@ -9,9 +9,9 @@ pub struct Stretch {
 }
 
 impl Stretch {
-    pub fn preallocated_accept(N: usize) -> Stretch {
+    pub fn preallocated_accept(size: usize) -> Stretch {
         let mut s = Stretch::default();
-        s.accept.resize(N, false);
+        s.accept.resize(size, false);
         s
     }
 }

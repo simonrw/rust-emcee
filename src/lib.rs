@@ -191,6 +191,64 @@
 //! sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
 //! ```
 //!
+//! #### Iterative sampling
+//!
+//! It is sometimes useful to get the internal values proposed and evaluated
+//! during each proposal step of the sampler. In the Python version, the
+//! method `sample` is a generator which can be iterated over to evaluate
+//! the sample steps.
+//!
+//! In this Rust version, we provide this feature by exposing the
+//! [`sample`][emcee-sample] method, which takes a callback, which is called
+//! once per iteration with a single [`Step`][emcee-step] object. For
+//! example:
+//!
+//! ```rust
+//! # use emcee::{Guess, Prob};
+//! # let nwalkers = 100;
+//! # let ndim = 2;  // m and c
+//! # struct Model<'a> {
+//! #     x: &'a [f32],
+//! #     y: &'a [f32],
+//! # }
+//! # // Linear model y = m * x + c
+//! # impl<'a> Prob for Model<'a> {
+//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #         let m = params[0];
+//! #         let c = params[1];
+//! #         -0.5 * self.x.iter().zip(self.y)
+//! #             .map(|(xval, yval)| {
+//! #                 let model = m * xval + c;
+//! #                 let residual = (yval - model).powf(2.0);
+//! #                 residual
+//! #             }).sum::<f32>()
+//! #     }
+//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #         // unimformative priors
+//! #         0.0f32
+//! #     }
+//! # }
+//! #
+//! # let initial_x = [0.0f32, 1.0f32, 2.0f32];
+//! # let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! #
+//! # let model = Model {
+//! #     x: &initial_x,
+//! #     y: &initial_y,
+//! # };
+//! #
+//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! #     .expect("could not create sampler");
+//! #
+//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
+//! # let niterations = 100;
+//! sampler.sample(&perturbed_guess, niterations, |step| {
+//!     println!("Current guess vectors: {:?}", step.pos);
+//!     println!("Current log posterior probabilities: {:?}", step.lnprob);
+//! });
+//! ```
+//!
 //! ### Studying the results
 //!
 //! The samples are stored in the sampler's `flatchain` which is constructed through the
@@ -252,16 +310,19 @@
 //! [1]: http://dan.iel.fm/emcee/current/
 //! [2]: http://msp.berkeley.edu/camcos/2010/5-1/p04.xhtml
 //! [3]: http://dan.iel.fm/
-//! [emcee-prob]: prob/trait.Prob.html
-//! [emcee-guess]: guess/struct.Guess.html
-//! [emcee-lnprob]: prob/trait.Prob.html#method.lnprob
+//! [emcee-prob]: trait.Prob.html
+//! [emcee-guess]: struct.Guess.html
+//! [emcee-lnprob]: trait.Prob.html#method.lnprob
 //! [std-infinity]: https://doc.rust-lang.org/std/f32/constant.INFINITY.html
-//! [emcee-create-initial-guess]: guess/struct.Guess.html#method.create_initial_guess
+//! [emcee-create-initial-guess]: struct.Guess.html#method.create_initial_guess
 //! [emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
+//! [emcee-sample]: struct.EnsembleSampler.html#method.sample
+//! [emcee-step]: struct.Step.html
 
 #![recursion_limit = "1024"]
+#![forbid(warnings)]
+#![warn(missing_docs)]
 
-#![allow(non_snake_case)]
 extern crate rand;
 #[macro_use]
 extern crate error_chain;
@@ -285,6 +346,21 @@ pub use prob::Prob;
 
 use stretch::Stretch;
 use stores::{Chain, ProbStore};
+
+/// Struct representing the current iteration evaluation
+///
+/// This struct is used with [`sample`][sample], which supplies a callback to each loop
+/// step. An instance of this struct is passed to the callback.
+///
+/// [sample]: struct.EnsembleSampler.html#method.sample
+#[derive(Debug)]
+pub struct Step<'a> {
+    /// The current list of parameters, one for each walker
+    pub pos: &'a [Guess],
+
+    /// The log posterior probabilities of the values contained in `pos`, one for each walker
+    pub lnprob: &'a [f32],
+}
 
 /// Affine-invariant Markov-chain Monte Carlo sampler
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
@@ -340,7 +416,17 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         self.rng = Box::new(StdRng::from_seed(seed));
     }
 
-    fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
+    /// Run the sampler with a callback called on each iteration
+    ///
+    /// On each iteration, this function is called with an instance of [`Step`][step] in the new
+    /// proposal position. The callback is passed as mutable so it can interact with state from the
+    /// calling site.
+    ///
+    /// [step]: struct.Step.html
+    pub fn sample<F>(&mut self, params: &[Guess], iterations: usize, mut callback: F) -> Result<()>
+        where F: FnMut(Step)
+    {
+
         // Take a copy of the params vector to mutate
         let mut lnprob = self.get_lnprob(params)?;
         let mut p = params.to_owned();
@@ -409,6 +495,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 }
             }
 
+            let step = Step {
+                pos: &p,
+                lnprob: &lnprob,
+            };
+
+            callback(step);
+
             self.iterations += 1;
         }
 
@@ -417,10 +510,10 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
     /// Run the sampling
     ///
-    /// This runs the sampler for `N` iterations. Errors are signalled by the function returning
-    /// a `Result`
-    pub fn run_mcmc(&mut self, p0: &[Guess], N: usize) -> Result<()> {
-        self.sample(p0, N)
+    /// This runs the sampler for `niterations` iterations. Errors are signalled by the function
+    /// returning a `Result`
+    pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<()> {
+        self.sample(p0, niterations, |_step| {})
     }
 
     /// Return the samples as computed by the sampler
@@ -451,27 +544,27 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         assert_eq!(p0.len() + p1.len(), self.nwalkers);
         let s = p0;
         let c = p1;
-        let Ns = s.len();
-        let Nc = c.len();
+        let ns = s.len();
+        let nc = c.len();
 
         // let z_range = Range::new(1.0f32, 2.0f32);
-        let rint_range = Range::new(0usize, Nc);
+        let rint_range = Range::new(0usize, nc);
         let unit_range = Range::new(0f32, 1f32);
 
         let a = 2.0f32;
-        let zz: Vec<f32> = (0..Ns)
+        let zz: Vec<f32> = (0..ns)
             .map(|_| {
                      ((a - 1.0) * unit_range.ind_sample(&mut self.rng) + 1.0f32).powf(2.0f32) /
                      2.0f32
                  })
             .collect();
 
-        let rint: Vec<usize> = (0..Ns)
+        let rint: Vec<usize> = (0..ns)
             .map(|_| rint_range.ind_sample(&mut self.rng))
             .collect();
 
-        let mut q = Vec::with_capacity(Ns);
-        for guess_i in 0..Ns {
+        let mut q = Vec::with_capacity(ns);
+        for guess_i in 0..ns {
             let mut values = Vec::with_capacity(self.dim);
             for param_i in 0..self.dim {
                 let other_index = rint[guess_i];
@@ -484,13 +577,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         }
         assert_eq!(q.len(), zz.len());
 
-        let mut out = Stretch::preallocated_accept(Ns);
+        let mut out = Stretch::preallocated_accept(ns);
         out.newlnprob = self.get_lnprob(&q)?;
         out.q = q;
 
-        assert_eq!(out.newlnprob.len(), Ns);
+        assert_eq!(out.newlnprob.len(), ns);
 
-        for i in 0..Ns {
+        for i in 0..ns {
             assert!(zz[i] > 0.);
             let lnpdiff = (self.dim as f32 - 1.0) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
             let test_value = unit_range.ind_sample(&mut self.rng).ln();
@@ -597,7 +690,26 @@ mod tests {
         let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
-        sampler.sample(&params, 1).unwrap();
+        sampler.run_mcmc(&params, 1).unwrap();
+        assert_eq!(sampler.iterations, 1);
+    }
+
+    #[test]
+    fn test_sample_with_callback() {
+        let (real_x, observed_y) = generate_dataset(20);
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
+
+        let nwalkers = 10;
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+
+        let params = p0.create_initial_guess(nwalkers);
+
+        let mut counter = 0;
+
+        sampler.sample(&params, 2, |_step| counter += 1).unwrap();
+        assert_eq!(counter, 2);
+        assert_eq!(sampler.iterations, 2);
     }
 
     #[test]
