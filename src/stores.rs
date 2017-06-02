@@ -3,9 +3,9 @@ use guess::Guess;
 #[derive(Debug, Default)]
 pub struct Chain {
     data: Vec<f32>,
-    nparams: usize,
-    nwalkers: usize,
-    niterations: usize,
+    pub nparams: usize,
+    pub nwalkers: usize,
+    pub niterations: usize,
 }
 
 impl Chain {
