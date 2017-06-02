@@ -132,6 +132,25 @@ let niterations = 100;
 sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
 ```
 
+#### Iterative sampling
+
+It is sometimes useful to get the internal values proposed and evaluated
+during each proposal step of the sampler. In the Python version, the
+method `sample` is a generator which can be iterated over to evaluate
+the sample steps.
+
+In this Rust version, we provide this feature by exposing the
+[`sample`][emcee-sample] method, which takes a callback, which is called
+once per iteration with a single [`Step`][emcee-step] object. For
+example:
+
+```rust
+sampler.sample(&perturbed_guess, niterations, |step| {
+    println!("Current guess vectors: {:?}", step.pos);
+    println!("Current log posterior probabilities: {:?}", step.lnprob);
+});
+```
+
 ### Studying the results
 
 The samples are stored in the sampler's `flatchain` which is constructed through the
@@ -151,14 +170,16 @@ for (i, guess) in flatchain.iter().enumerate() {
 ```
 
 [emcee]: http://dan.iel.fm/emcee/current/
-[emcee-prob]: prob/trait.Prob.html
-[emcee-guess]: guess/struct.Guess.html
-[emcee-lnprob]: prob/trait.Prob.html#method.lnprob
+[emcee-prob]: https://docs.rs/emcee/0.3.0/emcee/trait.Prob.html
+[emcee-guess]: https://docs.rs/emcee/0.3.0/emcee/struct.Guess.html
+[emcee-lnprob]: https://docs.rs/emcee/0.3.0/emcee/trait.Prob.html#method.lnprob
 [std-infinity]: https://doc.rust-lang.org/std/f32/constant.INFINITY.html
-[emcee-create-initial-guess]: guess/struct.Guess.html#method.create_initial_guess
-[emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
+[emcee-create-initial-guess]: https://docs.rs/emcee/0.3.0/emcee/struct.Guess.html#method.create_initial_guess
+[emcee-flatchain]: https://docs.rs/emcee/0.3.0/emcee/struct.EnsembleSampler.html#method.flatchain
 [docs]: https://docs.rs/emcee
 [fitting-model-to-data]: https://github.com/mindriot101/rust-emcee/blob/master/examples/fitting_a_model_to_data.rs
 [fitting-model-to-data-python]: http://dan.iel.fm/emcee/current/user/line/
 [dfm]: http://dan.iel.fm/
 [dfm-license]: https://github.com/mindriot101/rust-emcee/blob/master/DFM-LICENSE
+[emcee-sample]: https://docs.rs/emcee/0.3.0/emcee/struct.EnsembleSampler.html#method.sample
+[emcee-step]: https://docs.rs/emcee/0.3.0/emcee/struct.Step.html

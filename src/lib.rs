@@ -191,6 +191,64 @@
 //! sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
 //! ```
 //!
+//! #### Iterative sampling
+//!
+//! It is sometimes useful to get the internal values proposed and evaluated
+//! during each proposal step of the sampler. In the Python version, the
+//! method `sample` is a generator which can be iterated over to evaluate
+//! the sample steps.
+//!
+//! In this Rust version, we provide this feature by exposing the
+//! [`sample`][emcee-sample] method, which takes a callback, which is called
+//! once per iteration with a single [`Step`][emcee-step] object. For
+//! example:
+//!
+//! ```rust
+//! # use emcee::{Guess, Prob};
+//! # let nwalkers = 100;
+//! # let ndim = 2;  // m and c
+//! # struct Model<'a> {
+//! #     x: &'a [f32],
+//! #     y: &'a [f32],
+//! # }
+//! # // Linear model y = m * x + c
+//! # impl<'a> Prob for Model<'a> {
+//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #         let m = params[0];
+//! #         let c = params[1];
+//! #         -0.5 * self.x.iter().zip(self.y)
+//! #             .map(|(xval, yval)| {
+//! #                 let model = m * xval + c;
+//! #                 let residual = (yval - model).powf(2.0);
+//! #                 residual
+//! #             }).sum::<f32>()
+//! #     }
+//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #         // unimformative priors
+//! #         0.0f32
+//! #     }
+//! # }
+//! #
+//! # let initial_x = [0.0f32, 1.0f32, 2.0f32];
+//! # let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! #
+//! # let model = Model {
+//! #     x: &initial_x,
+//! #     y: &initial_y,
+//! # };
+//! #
+//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! #     .expect("could not create sampler");
+//! #
+//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
+//! # let niterations = 100;
+//! sampler.sample(&perturbed_guess, niterations, |step| {
+//!     println!("Current guess vectors: {:?}", step.pos);
+//!     println!("Current log posterior probabilities: {:?}", step.lnprob);
+//! });
+//! ```
+//!
 //! ### Studying the results
 //!
 //! The samples are stored in the sampler's `flatchain` which is constructed through the
@@ -252,12 +310,14 @@
 //! [1]: http://dan.iel.fm/emcee/current/
 //! [2]: http://msp.berkeley.edu/camcos/2010/5-1/p04.xhtml
 //! [3]: http://dan.iel.fm/
-//! [emcee-prob]: prob/trait.Prob.html
-//! [emcee-guess]: guess/struct.Guess.html
-//! [emcee-lnprob]: prob/trait.Prob.html#method.lnprob
+//! [emcee-prob]: trait.Prob.html
+//! [emcee-guess]: struct.Guess.html
+//! [emcee-lnprob]: trait.Prob.html#method.lnprob
 //! [std-infinity]: https://doc.rust-lang.org/std/f32/constant.INFINITY.html
-//! [emcee-create-initial-guess]: guess/struct.Guess.html#method.create_initial_guess
+//! [emcee-create-initial-guess]: struct.Guess.html#method.create_initial_guess
 //! [emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
+//! [emcee-sample]: struct.EnsembleSampler.html#method.sample
+//! [emcee-step]: struct.Step.html
 
 #![recursion_limit = "1024"]
 #![forbid(warnings)]
