@@ -158,7 +158,7 @@ The samples are stored in the sampler's `flatchain` which is constructed through
 [`flatchain`][emcee-flatchain] method on the sampler:
 
 ```rust
-let flatchain = sampler.flatchain();
+let flatchain = sampler.flatchain().unwrap();
 
 for (i, guess) in flatchain.iter().enumerate() {
     // Skip possible "burn-in" phase

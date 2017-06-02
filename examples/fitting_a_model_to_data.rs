@@ -148,7 +148,7 @@ fn main() {
     sampler.seed(&[42]);
     sampler.run_mcmc(&pos, 500).unwrap();
 
-    let flatchain = sampler.flatchain();
+    let flatchain = sampler.flatchain().unwrap();
 
     let file = File::create("/tmp/emcee-results.txt").expect("opening output file");
     let mut writer = BufWriter::new(&file);
