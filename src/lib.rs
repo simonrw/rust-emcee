@@ -289,10 +289,10 @@ use stores::{Chain, ProbStore};
 
 /// Struct representing the current iteration evaluation
 ///
-/// This struct is used with [`sample_with`][sample-with], which supplies a callback to each loop
+/// This struct is used with [`sample`][sample], which supplies a callback to each loop
 /// step. An instance of this struct is passed to the callback.
 ///
-/// [sample-with]: struct.EnsembleSampler.html#method.sample_with
+/// [sample]: struct.EnsembleSampler.html#method.sample
 #[derive(Debug)]
 pub struct Step<'a> {
     /// The current list of parameters, one for each walker
@@ -363,11 +363,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// calling site.
     ///
     /// [step]: struct.Step.html
-    pub fn sample_with<F>(&mut self,
-                          params: &[Guess],
-                          iterations: usize,
-                          mut callback: F)
-                          -> Result<()>
+    pub fn sample<F>(&mut self, params: &[Guess], iterations: usize, mut callback: F) -> Result<()>
         where F: FnMut(Step)
     {
 
@@ -452,16 +448,12 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         Ok(())
     }
 
-    fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
-        self.sample_with(params, iterations, |_step| {})
-    }
-
     /// Run the sampling
     ///
     /// This runs the sampler for `niterations` iterations. Errors are signalled by the function
     /// returning a `Result`
     pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<()> {
-        self.sample(p0, niterations)
+        self.sample(p0, niterations, |_step| {})
     }
 
     /// Return the samples as computed by the sampler
@@ -638,7 +630,7 @@ mod tests {
         let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
-        sampler.sample(&params, 1).unwrap();
+        sampler.run_mcmc(&params, 1).unwrap();
         assert_eq!(sampler.iterations, 1);
     }
 
@@ -655,9 +647,7 @@ mod tests {
 
         let mut counter = 0;
 
-        sampler
-            .sample_with(&params, 2, |_step| counter += 1)
-            .unwrap();
+        sampler.sample(&params, 2, |_step| counter += 1).unwrap();
         assert_eq!(counter, 2);
         assert_eq!(sampler.iterations, 2);
     }
