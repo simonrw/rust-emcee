@@ -260,8 +260,9 @@
 //! [emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
 
 #![recursion_limit = "1024"]
+#![forbid(warnings)]
+#![warn(missing_docs)]
 
-#![allow(non_snake_case)]
 extern crate rand;
 #[macro_use]
 extern crate error_chain;
@@ -459,8 +460,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     ///
     /// This runs the sampler for `niterations` iterations. Errors are signalled by the function
     /// returning a `Result`
-    pub fn run_mcmc(&mut self, p0: &[Guess], N: usize) -> Result<()> {
-        self.sample(p0, N)
+    pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<()> {
+        self.sample(p0, niterations)
     }
 
     /// Return the samples as computed by the sampler
@@ -491,27 +492,27 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         assert_eq!(p0.len() + p1.len(), self.nwalkers);
         let s = p0;
         let c = p1;
-        let Ns = s.len();
-        let Nc = c.len();
+        let ns = s.len();
+        let nc = c.len();
 
         // let z_range = Range::new(1.0f32, 2.0f32);
-        let rint_range = Range::new(0usize, Nc);
+        let rint_range = Range::new(0usize, nc);
         let unit_range = Range::new(0f32, 1f32);
 
         let a = 2.0f32;
-        let zz: Vec<f32> = (0..Ns)
+        let zz: Vec<f32> = (0..ns)
             .map(|_| {
                      ((a - 1.0) * unit_range.ind_sample(&mut self.rng) + 1.0f32).powf(2.0f32) /
                      2.0f32
                  })
             .collect();
 
-        let rint: Vec<usize> = (0..Ns)
+        let rint: Vec<usize> = (0..ns)
             .map(|_| rint_range.ind_sample(&mut self.rng))
             .collect();
 
-        let mut q = Vec::with_capacity(Ns);
-        for guess_i in 0..Ns {
+        let mut q = Vec::with_capacity(ns);
+        for guess_i in 0..ns {
             let mut values = Vec::with_capacity(self.dim);
             for param_i in 0..self.dim {
                 let other_index = rint[guess_i];
@@ -524,13 +525,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         }
         assert_eq!(q.len(), zz.len());
 
-        let mut out = Stretch::preallocated_accept(Ns);
+        let mut out = Stretch::preallocated_accept(ns);
         out.newlnprob = self.get_lnprob(&q)?;
         out.q = q;
 
-        assert_eq!(out.newlnprob.len(), Ns);
+        assert_eq!(out.newlnprob.len(), ns);
 
-        for i in 0..Ns {
+        for i in 0..ns {
             assert!(zz[i] > 0.);
             let lnpdiff = (self.dim as f32 - 1.0) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
             let test_value = unit_range.ind_sample(&mut self.rng).ln();
@@ -654,7 +655,9 @@ mod tests {
 
         let mut counter = 0;
 
-        sampler.sample_with(&params, 2, |_step| counter += 1).unwrap();
+        sampler
+            .sample_with(&params, 2, |_step| counter += 1)
+            .unwrap();
         assert_eq!(counter, 2);
         assert_eq!(sampler.iterations, 2);
     }
