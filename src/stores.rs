@@ -45,7 +45,6 @@ impl Chain {
         }
     }
 
-    // TODO: this causes a lot of allocations, though it happens only once at the user's request
     pub fn flatchain(&self) -> Vec<Guess> {
         let mut out = Vec::with_capacity(self.niterations * self.nwalkers);
         let mut buffer = vec![0f32; self.nparams];
