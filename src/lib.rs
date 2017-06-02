@@ -377,6 +377,8 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     proposal_scale: f32,
     chain: Option<Chain>,
     probstore: Option<ProbStore>,
+
+    /// Allow disabling of storing the chain
     storechain: bool,
 
     /// Thin the stored chains by this much
@@ -426,11 +428,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// accepts.
     pub fn seed(&mut self, seed: &[usize]) {
         self.rng = Box::new(StdRng::from_seed(seed));
-    }
-
-    /// Disable storing the chain
-    pub fn disable_store(&mut self) {
-        self.storechain = false;
     }
 
     /// Run the sampler with a callback called on each iteration
@@ -921,7 +918,7 @@ mod tests {
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
         sampler.seed(&[0]);
-        sampler.disable_store();
+        sampler.storechain = false;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
         assert!(sampler.chain.is_none());
     }
