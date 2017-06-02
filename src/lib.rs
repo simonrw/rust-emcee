@@ -286,6 +286,21 @@ pub use prob::Prob;
 use stretch::Stretch;
 use stores::{Chain, ProbStore};
 
+/// Struct representing the current iteration evaluation
+///
+/// This struct is used with [`sample_with`][sample-with], which supplies a callback to each loop
+/// step. An instance of this struct is passed to the callback.
+///
+/// [sample-with]: struct.EnsembleSampler.html#method.sample_with
+#[derive(Debug)]
+pub struct Step<'a> {
+    /// The current list of parameters, one for each walker
+    pub pos: &'a [Guess],
+
+    /// The log posterior probabilities of the values contained in `pos`, one for each walker
+    pub lnprob: &'a [f32],
+}
+
 /// Affine-invariant Markov-chain Monte Carlo sampler
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
@@ -340,7 +355,21 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         self.rng = Box::new(StdRng::from_seed(seed));
     }
 
-    fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
+    /// Run the sampler with a callback called on each iteration
+    ///
+    /// On each iteration, this function is called with an instance of [`Step`][step] in the new
+    /// proposal position. The callback is passed as mutable so it can interact with state from the
+    /// calling site.
+    ///
+    /// [step]: struct.Step.html
+    pub fn sample_with<F>(&mut self,
+                          params: &[Guess],
+                          iterations: usize,
+                          mut callback: F)
+                          -> Result<()>
+        where F: FnMut(Step)
+    {
+
         // Take a copy of the params vector to mutate
         let mut lnprob = self.get_lnprob(params)?;
         let mut p = params.to_owned();
@@ -409,16 +438,27 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                 }
             }
 
+            let step = Step {
+                pos: &p,
+                lnprob: &lnprob,
+            };
+
+            callback(step);
+
             self.iterations += 1;
         }
 
         Ok(())
     }
 
+    fn sample(&mut self, params: &[Guess], iterations: usize) -> Result<()> {
+        self.sample_with(params, iterations, |_step| {})
+    }
+
     /// Run the sampling
     ///
-    /// This runs the sampler for `N` iterations. Errors are signalled by the function returning
-    /// a `Result`
+    /// This runs the sampler for `niterations` iterations. Errors are signalled by the function
+    /// returning a `Result`
     pub fn run_mcmc(&mut self, p0: &[Guess], N: usize) -> Result<()> {
         self.sample(p0, N)
     }
@@ -598,6 +638,25 @@ mod tests {
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.sample(&params, 1).unwrap();
+        assert_eq!(sampler.iterations, 1);
+    }
+
+    #[test]
+    fn test_sample_with_callback() {
+        let (real_x, observed_y) = generate_dataset(20);
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
+
+        let nwalkers = 10;
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+
+        let params = p0.create_initial_guess(nwalkers);
+
+        let mut counter = 0;
+
+        sampler.sample_with(&params, 2, |_step| counter += 1).unwrap();
+        assert_eq!(counter, 2);
+        assert_eq!(sampler.iterations, 2);
     }
 
     #[test]
