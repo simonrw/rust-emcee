@@ -329,7 +329,7 @@ extern crate rand;
 #[macro_use]
 extern crate assert_approx_eq;
 
-mod errors;
+pub mod errors;
 mod guess;
 mod prob;
 mod stretch;
