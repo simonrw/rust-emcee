@@ -558,31 +558,25 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let rint_range = Range::new(0usize, nc);
         let unit_range = Range::new(0f32, 1f32);
 
-        let zz: Vec<f32> = (0..ns)
-            .map(|_| {
-                     ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) +
-                      1.0f32)
-                             .powf(2.0f32) / self.proposal_scale
-                 })
-            .collect();
-
-        let rint: Vec<usize> = (0..ns)
-            .map(|_| rint_range.ind_sample(&mut self.rng))
-            .collect();
-
         let mut q = Vec::with_capacity(ns);
+        let mut all_zz = Vec::with_capacity(ns);
         for guess_i in 0..ns {
+            let zz = ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) +
+                      1.0f32)
+                    .powf(2.0f32) / self.proposal_scale;
+            let rint = rint_range.ind_sample(&mut self.rng);
+
             let mut values = Vec::with_capacity(self.dim);
             for param_i in 0..self.dim {
-                let other_index = rint[guess_i];
-                let random_c = c[other_index][param_i];
+                let random_c = c[rint][param_i];
                 let guess_diff = random_c - s[guess_i][param_i];
-                let new_value = random_c - zz[guess_i] * guess_diff;
+                let new_value = random_c - zz * guess_diff;
                 values.push(new_value);
             }
             q.push(Guess { values });
+            all_zz.push(zz);
         }
-        assert_eq!(q.len(), zz.len());
+        assert_eq!(q.len(), all_zz.len());
 
         let mut out = Stretch::preallocated_accept(ns);
         out.newlnprob = self.get_lnprob(&q)?;
@@ -591,8 +585,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         assert_eq!(out.newlnprob.len(), ns);
 
         for i in 0..ns {
-            assert!(zz[i] > 0.);
-            let lnpdiff = (self.dim as f32 - 1.0) * zz[i].ln() + out.newlnprob[i] - lnprob0[i];
+            assert!(all_zz[i] > 0.);
+            let lnpdiff = (self.dim as f32 - 1.0) * all_zz[i].ln() + out.newlnprob[i] - lnprob0[i];
             let test_value = unit_range.ind_sample(&mut self.rng).ln();
 
             if lnpdiff > test_value {
