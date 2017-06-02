@@ -335,6 +335,7 @@ mod prob;
 mod stretch;
 mod stores;
 
+use std::borrow::Cow;
 use rand::{StdRng, Rng, SeedableRng};
 use rand::distributions::{Range, IndependentSample};
 
@@ -359,10 +360,10 @@ use stores::{Chain, ProbStore};
 #[derive(Debug)]
 pub struct Step<'a> {
     /// The current list of parameters, one for each walker
-    pub pos: &'a [Guess],
+    pub pos: Cow<'a, [Guess]>,
 
     /// The log posterior probabilities of the values contained in `pos`, one for each walker
-    pub lnprob: &'a [f32],
+    pub lnprob: Cow<'a, [f32]>,
 
     /// The current iteration number
     pub iteration: usize,
@@ -439,7 +440,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// calling site.
     ///
     /// [step]: struct.Step.html
-    pub fn sample<F>(&mut self, params: &[Guess], iterations: usize, mut callback: F) -> Result<()>
+    pub fn sample<F>(&mut self,
+                     params: &[Guess],
+                     iterations: usize,
+                     mut callback: F)
+                     -> Result<Step>
         where F: FnMut(Step)
     {
 
@@ -514,8 +519,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             }
 
             let step = Step {
-                pos: &p,
-                lnprob: &lnprob,
+                pos: Cow::Borrowed(&p),
+                lnprob: Cow::Borrowed(&lnprob),
                 iteration: iteration,
             };
 
@@ -524,14 +529,20 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             self.iterations += 1;
         }
 
-        Ok(())
+        let step = Step {
+            pos: Cow::Owned(p),
+            lnprob: Cow::Owned(lnprob),
+            iteration: iterations - 1,
+        };
+
+        Ok(step)
     }
 
     /// Run the sampling
     ///
     /// This runs the sampler for `niterations` iterations. Errors are signalled by the function
     /// returning a `Result`
-    pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<()> {
+    pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<Step> {
         self.sample(p0, niterations, |_step| {})
     }
 
