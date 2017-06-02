@@ -17,7 +17,6 @@ version = "0.3.0"
 repository = "mindriot101/rust-emcee"
 
 [dependencies]
-error-chain = "0.10.0"
 rand = "0.3.15"
 
 [dev-dependencies]

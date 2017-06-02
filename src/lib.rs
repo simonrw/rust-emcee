@@ -320,13 +320,10 @@
 //! [emcee-sample]: struct.EnsembleSampler.html#method.sample
 //! [emcee-step]: struct.Step.html
 
-#![recursion_limit = "1024"]
 #![forbid(warnings)]
 #![warn(missing_docs)]
 
 extern crate rand;
-#[macro_use]
-extern crate error_chain;
 
 #[cfg(test)]
 #[macro_use]
@@ -396,13 +393,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// number of parameters
     pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Result<Self> {
         if nwalkers % 2 != 0 {
-            return Err(ErrorKind::InvalidInputs("the number of walkers must be even").into());
+            return Err(EmceeError::InvalidInputs("the number of walkers must be even".into()));
         }
 
         if nwalkers <= 2 * dim {
             let msg = "the number of walkers should be more than \
                        twice the dimension of your parameter space";
-            return Err(ErrorKind::InvalidInputs(msg).into());
+            return Err(EmceeError::InvalidInputs(msg.into()));
         }
 
         Ok(EnsembleSampler {
@@ -837,13 +834,8 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
         match EnsembleSampler::new(3, 3, &foo) {
-            Err(e) => {
-                match Error::from(e) {
-                    Error(ErrorKind::InvalidInputs(msg), _) => {
-                        assert!(msg.contains("number of walkers must be even"));
-                    }
-                    _ => panic!("incorrect"),
-                }
+            Err(EmceeError::InvalidInputs(msg)) => {
+                assert!(msg.contains("number of walkers must be even"));
             }
             _ => panic!("incorrect"),
         }
@@ -854,13 +846,8 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
         match EnsembleSampler::new(4, 3, &foo) {
-            Err(e) => {
-                match Error::from(e) {
-                    Error(ErrorKind::InvalidInputs(msg), _) => {
-                        assert!(msg.contains("should be more than twice"));
-                    }
-                    _ => panic!("incorrect"),
-                }
+            Err(EmceeError::InvalidInputs(msg)) => {
+                assert!(msg.contains("should be more than twice"));
             }
             _ => panic!("incorrect"),
         }
