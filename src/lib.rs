@@ -374,6 +374,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     lnprob: &'a T,
     dim: usize,
     rng: Box<Rng>,
+    proposal_scale: f32,
     chain: Option<Chain>,
     probstore: Option<ProbStore>,
 }
@@ -405,6 +406,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                dim: dim,
                naccepted: vec![0; nwalkers],
                rng: Box::new(rand::thread_rng()),
+               proposal_scale: 2.0,
                chain: None,
                probstore: None,
            })
@@ -556,11 +558,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let rint_range = Range::new(0usize, nc);
         let unit_range = Range::new(0f32, 1f32);
 
-        let a = 2.0f32;
         let zz: Vec<f32> = (0..ns)
             .map(|_| {
-                     ((a - 1.0) * unit_range.ind_sample(&mut self.rng) + 1.0f32).powf(2.0f32) /
-                     2.0f32
+                     ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) +
+                      1.0f32)
+                             .powf(2.0f32) / self.proposal_scale
                  })
             .collect();
 
