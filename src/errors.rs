@@ -29,10 +29,13 @@ pub type Result<T> = ::std::result::Result<T, EmceeError>;
 
 impl ::std::error::Error for EmceeError {
     fn description(&self) -> &str {
+        use EmceeError::*;
+
         let details = match *self {
-            EmceeError::InvalidInputs(ref msg) => msg,
-            EmceeError::Msg(ref msg) => msg,
+            InvalidInputs(ref msg) |
+            Msg(ref msg) => msg,
         };
+
         details.as_str()
     }
 
