@@ -347,8 +347,13 @@ use stores::{Chain, ProbStore};
 
 /// Struct representing the current iteration evaluation
 ///
-/// This struct is used with [`sample`][sample], which supplies a callback to each loop
-/// step. An instance of this struct is passed to the callback.
+/// This struct is used with [`sample`][sample], which supplies a callback to
+/// each loop step. An instance of this struct is passed to the callback.
+///
+/// Technical note: the `pos` and `lnprob` slices are implemented as `Cow`
+/// wrapped objects, as during iteration, their contents are references (as the
+/// values are stored with a longer lived lifetime in the sampler method),
+/// whereas the function must return _owned_ values.
 ///
 /// [sample]: struct.EnsembleSampler.html#method.sample
 #[derive(Debug)]
