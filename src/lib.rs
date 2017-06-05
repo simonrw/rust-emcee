@@ -370,7 +370,7 @@ pub struct Step<'a> {
 }
 
 /// Affine-invariant Markov-chain Monte Carlo sampler
-pub struct EnsembleSampler<'a, T: Prob + 'a> {
+pub struct EnsembleSampler<'a, 'b, T: Prob + 'a> {
     nwalkers: usize,
     naccepted: Vec<usize>,
     iterations: usize,
@@ -380,6 +380,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     proposal_scale: f32,
     chain: Option<Chain>,
     probstore: Option<ProbStore>,
+    initial_state: Option<&'b Step<'b>>,
 
     /// Allow disabling of storing the chain
     storechain: bool,
@@ -388,7 +389,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     pub thin: usize,
 }
 
-impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
+impl<'a, 'b, T: Prob + 'a> EnsembleSampler<'a, 'b, T> {
     /// Create a new `EnsembleSampler`
     ///
     /// Errors are handled by returning a [`Result`](errors/type.Result.html) which contains
@@ -420,6 +421,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                probstore: None,
                storechain: true,
                thin: 1,
+               initial_state: None,
            })
     }
 
@@ -544,6 +546,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// returning a `Result`
     pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<Step> {
         self.sample(p0, niterations, |_step| {})
+    }
+
+
+    /// Set the initial state of the sampler
+    pub fn set_initial_state(&mut self, state0: &'b Step) -> &Self {
+        self.initial_state = Some(state0);
+        self
     }
 
     /// Return the samples as computed by the sampler
@@ -994,7 +1003,7 @@ mod tests {
     }
 
     // Test helper functions
-    fn check_sampler<'a, T: Prob + 'a>(sampler: &mut EnsembleSampler<'a, T>,
+    fn check_sampler<'a, 'b, T: Prob + 'a>(sampler: &mut EnsembleSampler<'a, 'b, T>,
                                        niter: usize,
                                        p0: &[Guess]) {
         let _ = sampler.run_mcmc(&p0, niter).unwrap();
