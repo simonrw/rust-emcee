@@ -8,11 +8,11 @@ use rand::distributions::{Normal, IndependentSample};
 #[derive(Debug, Clone)]
 pub struct Guess {
     /// A position in parameter space
-    pub values: Vec<f32>,
+    pub values: Vec<f64>,
 }
 
 impl ::std::ops::Index<usize> for Guess {
-    type Output = f32;
+    type Output = f64;
 
     fn index(&self, idx: usize) -> &Self::Output {
         &self.values[idx]
@@ -20,14 +20,14 @@ impl ::std::ops::Index<usize> for Guess {
 }
 
 impl ::std::ops::IndexMut<usize> for Guess {
-    fn index_mut(&mut self, idx: usize) -> &mut f32 {
+    fn index_mut(&mut self, idx: usize) -> &mut f64 {
         &mut self.values[idx]
     }
 }
 
 impl Guess {
     /// Create a guess from a slice
-    pub fn new(values: &[f32]) -> Self {
+    pub fn new(values: &[f64]) -> Self {
         Guess { values: Vec::from(values) }
     }
 
@@ -68,7 +68,7 @@ impl Guess {
 
         let normal = Normal::new(0.0, 1E-5);
         for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut ::rand::thread_rng()) as f32;
+            *elem += normal.ind_sample(&mut ::rand::thread_rng()) as f64;
         }
 
         Guess { values: new_values }
@@ -79,7 +79,7 @@ impl Guess {
 
         let normal = Normal::new(0.0, 1E-5);
         for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut rng) as f32;
+            *elem += normal.ind_sample(&mut rng) as f64;
         }
 
         Guess { values: new_values }
@@ -93,35 +93,35 @@ mod tests {
 
     #[test]
     fn test_pertubation() {
-        let guess = Guess::new(&[1.0f32, 2.0f32]);
+        let guess = Guess::new(&[1.0f64, 2.0f64]);
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let perturbed = guess.perturb_with_rng(&mut rng);
-        assert!(perturbed[0] != 1.0f32);
-        assert!(perturbed[1] != 2.0f32);
+        assert!(perturbed[0] != 1.0f64);
+        assert!(perturbed[1] != 2.0f64);
     }
 
     #[test]
     fn test_initial_guess() {
-        let guess = Guess::new(&[1.0f32, 2.0f32]);
+        let guess = Guess::new(&[1.0f64, 2.0f64]);
         let initial = guess.create_initial_guess(10);
         assert_eq!(initial.len(), 10);
     }
 
     #[test]
     fn test_contains_infinites() {
-        let guess = Guess::new(&[::std::f32::INFINITY]);
+        let guess = Guess::new(&[::std::f64::INFINITY]);
         assert!(guess.contains_infs());
 
-        let guess = Guess::new(&[0f32]);
+        let guess = Guess::new(&[0f64]);
         assert!(!guess.contains_infs());
     }
 
     #[test]
     fn test_contains_nans() {
-        let guess = Guess::new(&[::std::f32::NAN]);
+        let guess = Guess::new(&[::std::f64::NAN]);
         assert!(guess.contains_nans());
 
-        let guess = Guess::new(&[0f32]);
+        let guess = Guess::new(&[0f64]);
         assert!(!guess.contains_nans());
     }
 

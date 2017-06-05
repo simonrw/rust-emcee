@@ -2,7 +2,7 @@ use guess::Guess;
 
 #[derive(Debug, Default)]
 pub struct Chain {
-    data: Vec<f32>,
+    data: Vec<f64>,
     pub nparams: usize,
     pub nwalkers: usize,
     pub niterations: usize,
@@ -14,11 +14,11 @@ impl Chain {
             nparams: nparams,
             nwalkers: nwalkers,
             niterations: niterations,
-            data: vec![0f32; nparams * nwalkers * niterations],
+            data: vec![0f64; nparams * nwalkers * niterations],
         }
     }
 
-    pub fn set(&mut self, param_idx: usize, walker_idx: usize, iteration_idx: usize, value: f32) {
+    pub fn set(&mut self, param_idx: usize, walker_idx: usize, iteration_idx: usize, value: f64) {
         assert!(param_idx < self.nparams);
         assert!(walker_idx < self.nwalkers);
         assert!(iteration_idx < self.niterations);
@@ -28,7 +28,7 @@ impl Chain {
         self.data[idx] = value;
     }
 
-    pub fn get(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> f32 {
+    pub fn get(&self, param_idx: usize, walker_idx: usize, iteration_idx: usize) -> f64 {
         assert!(param_idx < self.nparams);
         assert!(walker_idx < self.nwalkers);
         assert!(iteration_idx < self.niterations);
@@ -38,7 +38,7 @@ impl Chain {
         self.data[idx]
     }
 
-    pub fn set_params(&mut self, walker_idx: usize, iteration_idx: usize, newdata: &[f32]) {
+    pub fn set_params(&mut self, walker_idx: usize, iteration_idx: usize, newdata: &[f64]) {
         assert_eq!(newdata.len(), self.nparams);
         for (idx, value) in newdata.iter().enumerate() {
             self.set(idx, walker_idx, iteration_idx, *value);
@@ -47,7 +47,7 @@ impl Chain {
 
     pub fn flatchain(&self) -> Vec<Guess> {
         let mut out = Vec::with_capacity(self.niterations * self.nwalkers);
-        let mut buffer = vec![0f32; self.nparams];
+        let mut buffer = vec![0f64; self.nparams];
         for iter in 0..self.niterations {
             for walker in 0..self.nwalkers {
                 for (i, value) in buffer.iter_mut().enumerate() {
@@ -66,7 +66,7 @@ impl Chain {
 
 #[derive(Debug, Default)]
 pub struct ProbStore {
-    data: Vec<f32>,
+    data: Vec<f64>,
     nwalkers: usize,
     niterations: usize,
 }
@@ -76,11 +76,11 @@ impl ProbStore {
         ProbStore {
             nwalkers: nwalkers,
             niterations: niterations,
-            data: vec![0f32; nwalkers * niterations],
+            data: vec![0f64; nwalkers * niterations],
         }
     }
 
-    pub fn set(&mut self, walker_idx: usize, iteration_idx: usize, value: f32) {
+    pub fn set(&mut self, walker_idx: usize, iteration_idx: usize, value: f64) {
         assert!(walker_idx < self.nwalkers);
         assert!(iteration_idx < self.niterations,
                 "iteration index {}, number of iterations required: {}",
@@ -92,7 +92,7 @@ impl ProbStore {
         self.data[idx] = value;
     }
 
-    pub fn set_probs(&mut self, iteration_idx: usize, newdata: &[f32]) {
+    pub fn set_probs(&mut self, iteration_idx: usize, newdata: &[f64]) {
         assert_eq!(newdata.len(), self.nwalkers);
         for (idx, value) in newdata.iter().enumerate() {
             self.set(idx, iteration_idx, *value);
@@ -124,16 +124,16 @@ mod test {
         assert_eq!(chain.index(0, 9, 0), 18);
         assert_eq!(chain.index(0, 0, 1), 20);
 
-        chain.set(0, 1, 0, 2.0f32);
-        assert_eq!(chain.data[2], 2.0f32);
-        assert_eq!(chain.get(0, 1, 0), 2.0f32);
+        chain.set(0, 1, 0, 2.0f64);
+        assert_eq!(chain.data[2], 2.0f64);
+        assert_eq!(chain.get(0, 1, 0), 2.0f64);
 
 
-        let newdata = vec![5.0f32, 100.0f32];
+        let newdata = vec![5.0f64, 100.0f64];
         chain.set_params(1, 250, &newdata);
 
-        assert_eq!(chain.get(0, 1, 250), 5.0f32);
-        assert_eq!(chain.get(1, 1, 250), 100.0f32);
+        assert_eq!(chain.get(0, 1, 250), 5.0f64);
+        assert_eq!(chain.get(1, 1, 250), 100.0f64);
     }
 
     #[test]
@@ -147,20 +147,20 @@ mod test {
         assert_eq!(store.index(2, 0), 2);
         assert_eq!(store.index(0, 1), 4);
 
-        store.set(1, 0, 2.0f32);
-        assert_eq!(store.data[1], 2.0f32);
-        assert_eq!(store_get(&store, 1, 0), 2.0f32);
+        store.set(1, 0, 2.0f64);
+        assert_eq!(store.data[1], 2.0f64);
+        assert_eq!(store_get(&store, 1, 0), 2.0f64);
 
 
-        let newdata = vec![5.0f32, 100.0f32, 1.0f32, 20f32];
+        let newdata = vec![5.0f64, 100.0f64, 1.0f64, 20f64];
         store.set_probs(250, &newdata);
 
-        assert_eq!(store_get(&store, 0, 250), 5.0f32);
-        assert_eq!(store_get(&store, 1, 250), 100.0f32);
-        assert_eq!(store_get(&store, 3, 250), 20.0f32);
+        assert_eq!(store_get(&store, 0, 250), 5.0f64);
+        assert_eq!(store_get(&store, 1, 250), 100.0f64);
+        assert_eq!(store_get(&store, 3, 250), 20.0f64);
     }
 
-    fn store_get(store: &ProbStore, walker_idx: usize, iteration_idx: usize) -> f32 {
+    fn store_get(store: &ProbStore, walker_idx: usize, iteration_idx: usize) -> f64 {
         assert!(walker_idx < store.nwalkers);
         assert!(iteration_idx < store.niterations);
 
