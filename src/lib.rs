@@ -142,7 +142,7 @@
 //!     y: &initial_y,
 //! };
 //!
-//! let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! let sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //!     .expect("could not create sampler");
 //! ```
 //!
@@ -182,7 +182,7 @@
 //! #     y: &initial_y,
 //! # };
 //! #
-//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! # let sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //! #     .expect("could not create sampler");
 //! #
 //! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
@@ -237,7 +237,7 @@
 //! #     y: &initial_y,
 //! # };
 //! #
-//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! # let sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //! #     .expect("could not create sampler");
 //! #
 //! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
@@ -289,7 +289,7 @@
 //! #     y: &initial_y,
 //! # };
 //! #
-//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! # let sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //! #     .expect("could not create sampler");
 //! #
 //! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
@@ -320,7 +320,6 @@
 //! [emcee-sample]: struct.EnsembleSampler.html#method.sample
 //! [emcee-step]: struct.Step.html
 
-#![forbid(warnings)]
 #![warn(missing_docs)]
 
 extern crate rand;
@@ -335,6 +334,7 @@ mod prob;
 mod stretch;
 mod stores;
 
+use std::cell::RefCell;
 use rand::{StdRng, Rng, SeedableRng};
 use rand::distributions::{Range, IndependentSample};
 
@@ -371,14 +371,16 @@ pub struct Step<'a> {
 /// Affine-invariant Markov-chain Monte Carlo sampler
 pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
-    naccepted: Vec<usize>,
-    iterations: usize,
     lnprob: &'a T,
     dim: usize,
-    rng: Box<Rng>,
     proposal_scale: f64,
-    chain: Option<Chain>,
-    probstore: Option<ProbStore>,
+
+    // Mutable members
+    rng: RefCell<Box<Rng>>,
+    naccepted: RefCell<Vec<usize>>,
+    iterations: RefCell<usize>,
+    chain: RefCell<Option<Chain>>,
+    probstore: RefCell<Option<ProbStore>>,
 
     /// Allow disabling of storing the chain
     storechain: bool,
@@ -409,14 +411,14 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
         Ok(EnsembleSampler {
                nwalkers: nwalkers,
-               iterations: 0,
+               iterations: RefCell::new(0),
                lnprob: lnprob,
                dim: dim,
-               naccepted: vec![0; nwalkers],
-               rng: Box::new(rand::thread_rng()),
+               naccepted: RefCell::new(vec![0; nwalkers]),
+               rng: RefCell::new(Box::new(rand::thread_rng())),
                proposal_scale: 2.0,
-               chain: None,
-               probstore: None,
+               chain: RefCell::new(None),
+               probstore: RefCell::new(None),
                storechain: true,
                thin: 1,
            })
@@ -428,8 +430,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// [`SeedableRng.from_seed`]
     /// (https://docs.rs/rand/0.3.15/rand/trait.SeedableRng.html#tymethod.from_seed)
     /// accepts.
-    pub fn seed(&mut self, seed: &[usize]) {
-        self.rng = Box::new(StdRng::from_seed(seed));
+    pub fn seed(&self, seed: &[usize]) {
+        *self.rng.borrow_mut() = Box::new(StdRng::from_seed(seed));
     }
 
     /// Run the sampler with a callback called on each iteration
@@ -439,7 +441,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// calling site.
     ///
     /// [step]: struct.Step.html
-    pub fn sample<F>(&mut self, params: &[Guess], iterations: usize, mut callback: F) -> Result<()>
+    pub fn sample<F>(&self, params: &[Guess], iterations: usize, mut callback: F) -> Result<()>
         where F: FnMut(Step)
     {
 
@@ -453,9 +455,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         }
 
         if self.storechain {
-            let niterations = iterations / self.thin;
-            self.chain = Some(Chain::new(self.dim, self.nwalkers, niterations));
-            self.probstore = Some(ProbStore::new(self.nwalkers, niterations));
+            *self.chain.borrow_mut() = Some(Chain::new(self.dim, self.nwalkers, iterations));
+            *self.probstore.borrow_mut() = Some(ProbStore::new(self.nwalkers, iterations));
         }
 
         for iteration in 0..iterations {
@@ -494,7 +495,10 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                             first[walker_idx][param_idx] = *param;
                         }
                         let real_walker_idx = walker_idx + ensemble_idx * halfk;
-                        self.naccepted[real_walker_idx] += 1;
+                        {
+                            let mut naccepted = self.naccepted.borrow_mut();
+                            naccepted[real_walker_idx] += 1;
+                        }
                     }
                 }
             }
@@ -503,12 +507,14 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             if iteration % self.thin == 0 {
                 let iteration = iteration / self.thin;
                 for (walker_idx, p_value) in p.iter().enumerate() {
-                    if let Some(ref mut chain) = self.chain {
+                    let mut chain = self.chain.borrow_mut();
+                    if let Some(ref mut chain) = *chain {
                         chain.set_params(walker_idx, iteration, &p_value.values);
                     }
 
-                    if let Some(ref mut probstore) = self.probstore {
-                        probstore.set_probs(iteration, &lnprob);
+                    let mut store = self.probstore.borrow_mut();
+                    if let Some(ref mut store) = *store {
+                        store.set_probs(iteration, &lnprob);
                     }
                 }
             }
@@ -521,7 +527,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
             callback(step);
 
-            self.iterations += 1;
+            *self.iterations.borrow_mut() += 1;
         }
 
         Ok(())
@@ -531,14 +537,15 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     ///
     /// This runs the sampler for `niterations` iterations. Errors are signalled by the function
     /// returning a `Result`
-    pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<()> {
+    pub fn run_mcmc(&self, p0: &[Guess], niterations: usize) -> Result<()> {
         self.sample(p0, niterations, |_step| {})
     }
 
     /// Return the samples as computed by the sampler
     pub fn flatchain(&self) -> Option<Vec<Guess>> {
-        match self.chain {
-            Some(ref chain) => Some(chain.flatchain()),
+        let mut chain = self.chain.borrow_mut();
+        match *chain {
+            Some(ref mut chain) => Some(chain.flatchain()),
             None => None,
         }
     }
@@ -546,20 +553,21 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// Return the number of iterations accepted, one value per walker
     pub fn acceptance_fraction(&self) -> Vec<f64> {
         self.naccepted
+            .borrow()
             .iter()
-            .map(|naccepted| *naccepted as f64 / self.iterations as f64)
+            .map(|naccepted| *naccepted as f64 / *self.iterations.borrow() as f64)
             .collect()
     }
 
     /// Return the sampler to its default state
     pub fn reset(&mut self) {
-        self.iterations = 0;
-        self.naccepted.resize(0, 0);
+        *self.iterations.borrow_mut() = 0;
+        self.naccepted.borrow_mut().resize(0, 0);
     }
 
     // Internal functions
 
-    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f64]) -> Result<Stretch> {
+    fn propose_stretch(&self, p0: &[Guess], p1: &[Guess], lnprob0: &[f64]) -> Result<Stretch> {
         assert_eq!(p0.len() + p1.len(), self.nwalkers);
         let s = p0;
         let c = p1;
@@ -573,10 +581,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let mut q = Vec::with_capacity(ns);
         let mut all_zz = Vec::with_capacity(ns);
         for sval in s {
-            let zz = ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) +
+            let zz = ((self.proposal_scale - 1.0) *
+                      unit_range.ind_sample(&mut *self.rng.borrow_mut()) +
                       1.0f64)
                     .powf(2.0f64) / self.proposal_scale;
-            let rint = rint_range.ind_sample(&mut self.rng);
+            let rint = rint_range.ind_sample(&mut *self.rng.borrow_mut());
 
             let mut values = Vec::with_capacity(self.dim);
             for (param_i, s_param) in sval.values.iter().enumerate() {
@@ -599,7 +608,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         for i in 0..ns {
             assert!(all_zz[i] > 0.);
             let lnpdiff = (self.dim as f64 - 1.0) * all_zz[i].ln() + out.newlnprob[i] - lnprob0[i];
-            let test_value = unit_range.ind_sample(&mut self.rng).ln();
+            let test_value = unit_range.ind_sample(&mut *self.rng.borrow_mut()).ln();
 
             if lnpdiff > test_value {
                 out.accept[i] = true;
@@ -608,7 +617,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         Ok(out)
     }
 
-    fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f64>> {
+    fn get_lnprob(&self, p: &[Guess]) -> Result<Vec<f64>> {
         let mut lnprobs = Vec::with_capacity(p.len());
         for guess in p {
             if guess.contains_infs() {
@@ -700,11 +709,11 @@ mod tests {
         let p0 = create_guess();
 
         let nwalkers = 10;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.run_mcmc(&params, 1).unwrap();
-        assert_eq!(sampler.iterations, 1);
+        assert_eq!(*sampler.iterations.borrow(), 1);
     }
 
     #[test]
@@ -714,7 +723,7 @@ mod tests {
         let p0 = create_guess();
 
         let nwalkers = 10;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
 
@@ -722,7 +731,7 @@ mod tests {
 
         sampler.sample(&params, 2, |_step| counter += 1).unwrap();
         assert_eq!(counter, 2);
-        assert_eq!(sampler.iterations, 2);
+        assert_eq!(*sampler.iterations.borrow(), 2);
     }
 
     #[test]
@@ -733,7 +742,7 @@ mod tests {
 
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.run_mcmc(&params, niters).unwrap();
@@ -769,7 +778,7 @@ mod tests {
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let nwalkers = 8;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
         let lnprob = sampler.get_lnprob(&pos).unwrap();
         let expected: Vec<f64> = vec![-4613.19497084, -4613.277985, -4613.25381092, -4613.1954303];
         for (a, b) in lnprob.iter().zip(expected) {
@@ -796,7 +805,7 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
-        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
         let (a, b) = pos.split_at(nwalkers / 2);
 
         assert_eq!(a.len(), nwalkers / 2);
@@ -816,11 +825,12 @@ mod tests {
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
-        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
         sampler.seed(&[0]);
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
 
-        if let Some(ref chain) = sampler.chain {
+        let chain = sampler.chain.borrow();
+        if let Some(ref chain) = *chain {
             /* Wide margins due to random numbers :( */
             assert_approx_eq!(chain.get(0, 0, niters - 2), 2.0f64, 1.0f64);
             assert_approx_eq!(chain.get(1, 0, niters - 2), 5.0f64, 1.0f64);
@@ -905,7 +915,7 @@ mod tests {
         sampler.seed(&[0]);
         sampler.storechain = false;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
-        assert!(sampler.chain.is_none());
+        assert!(sampler.chain.borrow().is_none());
     }
 
     #[test]
@@ -922,7 +932,11 @@ mod tests {
         sampler.seed(&[0]);
         sampler.thin = 500;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
-        assert_eq!(sampler.chain.unwrap().niterations, 2);
+        let chain = sampler.chain.borrow();
+        match *chain {
+            Some(ref chain) => assert_eq!(chain.niterations, niters),
+            None => panic!("chain should not be `None`"),
+        }
     }
 
     #[test]
@@ -970,13 +984,13 @@ mod tests {
                  })
             .collect();
 
-        let mut sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
         sampler.seed(&[1]);
-        check_sampler(&mut sampler, niter, &p0);
+        check_sampler(&sampler, niter, &p0);
     }
 
     // Test helper functions
-    fn check_sampler<'a, T: Prob + 'a>(sampler: &mut EnsembleSampler<'a, T>,
+    fn check_sampler<'a, T: Prob + 'a>(sampler: &EnsembleSampler<'a, T>,
                                        niter: usize,
                                        p0: &[Guess]) {
         let _ = sampler.run_mcmc(&p0, niter).unwrap();

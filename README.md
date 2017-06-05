@@ -121,7 +121,7 @@ let model = Model {
     y: &initial_y,
 };
 
-let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+let sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
     .expect("could not create sampler");
 ```
 
