@@ -12,20 +12,20 @@ mod benchmarks {
     use emcee::{EnsembleSampler, Guess, Prob};
 
     struct MultivariateProb<'a> {
-        icov: &'a [[f32; 5]; 5],
+        icov: &'a [[f64; 5]; 5],
     }
 
     impl<'a> Prob for MultivariateProb<'a> {
         // Stub methods as they are not used
-        fn lnlike(&self, _params: &Guess) -> f32 {
-            0.0f32
+        fn lnlike(&self, _params: &Guess) -> f64 {
+            0.0f64
         }
-        fn lnprior(&self, _params: &Guess) -> f32 {
-            0.0f32
+        fn lnprior(&self, _params: &Guess) -> f64 {
+            0.0f64
         }
 
-        fn lnprob(&self, params: &Guess) -> f32 {
-            let mut values = [0f32; 5];
+        fn lnprob(&self, params: &Guess) -> f64 {
+            let mut values = [0f64; 5];
             for (i, value) in params.values.iter().enumerate() {
                 values[i] = *value;
             }
@@ -72,7 +72,7 @@ mod benchmarks {
             .map(|_| {
                      Guess {
                          values: (0..ndim)
-                             .map(|_| 0.1f32 * norm_range.ind_sample(&mut rng) as f32)
+                             .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
                              .collect(),
                      }
                  })
@@ -85,8 +85,8 @@ mod benchmarks {
         b.iter(|| sampler.sample(&p0, 1, |_| {}).unwrap());
     }
 
-    fn mat_vec_mul(m: &[[f32; 5]; 5], v: &[f32; 5]) -> [f32; 5] {
-        let mut out = [0.0f32; 5];
+    fn mat_vec_mul(m: &[[f64; 5]; 5], v: &[f64; 5]) -> [f64; 5] {
+        let mut out = [0.0f64; 5];
 
         for i in 0..5 {
             out[i] = v[0] * m[i][0] + v[1] * m[i][1] + v[2] * m[i][2] + v[3] * m[i][3] +
@@ -96,8 +96,8 @@ mod benchmarks {
         out
     }
 
-    fn vec_vec_mul(v1: &[f32; 5], v2: &[f32; 5]) -> f32 {
-        let mut out = 0.0f32;
+    fn vec_vec_mul(v1: &[f64; 5], v2: &[f64; 5]) -> f64 {
+        let mut out = 0.0f64;
         for i in 0..5 {
             out += v1[i] * v2[i];
         }

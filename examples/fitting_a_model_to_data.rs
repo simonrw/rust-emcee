@@ -14,14 +14,14 @@ use rand::{StdRng, SeedableRng};
 
 use emcee::{Guess, Prob};
 
-fn sort(data: &mut Vec<f32>) {
+fn sort(data: &mut Vec<f64>) {
     data.sort_by(|a, b| a.partial_cmp(b).unwrap());
 }
 
-fn compute_quantiles(chain: &[Guess]) -> Vec<[f32; 3]> {
+fn compute_quantiles(chain: &[Guess]) -> Vec<[f64; 3]> {
     let nparams = chain[0].values.len();
     let niterations = chain.len();
-    let mut param_vecs: Vec<Vec<f32>> = vec![Vec::with_capacity(chain.len()); nparams];
+    let mut param_vecs: Vec<Vec<f64>> = vec![Vec::with_capacity(chain.len()); nparams];
     for guess in chain {
         for (param, value) in guess.values.iter().enumerate() {
             param_vecs[param].push(*value);
@@ -29,9 +29,9 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f32; 3]> {
     }
 
     let mut out = Vec::with_capacity(nparams);
-    let lower_idx = (0.16 * niterations as f32) as usize;
-    let med_idx = (0.5 * niterations as f32) as usize;
-    let upper_idx = (0.84 * niterations as f32) as usize;
+    let lower_idx = (0.16 * niterations as f64) as usize;
+    let med_idx = (0.5 * niterations as f64) as usize;
+    let upper_idx = (0.84 * niterations as f64) as usize;
 
     for mut v in &mut param_vecs {
         sort(&mut v);
@@ -49,19 +49,19 @@ fn main() {
 
     /* Pre-generate rng and distributions */
     let mut rng = StdRng::from_seed(&[42]);
-    let unit_range = Range::new(0f32, 1f32);
+    let unit_range = Range::new(0f64, 1f64);
     let norm_gen = Normal::new(0.0, 1.0);
 
     // Choose the "true" parameters.
-    let m_true = -0.9594f32;
-    let b_true = 4.294f32;
-    let f_true = 0.534f32;
+    let m_true = -0.9594f64;
+    let b_true = 4.294f64;
+    let f_true = 0.534f64;
 
     // Generate some synthetic data from the model.
     let npoints = 50usize;
     let x = {
         let mut unsorted: Vec<_> = (0..npoints)
-            .map(|_| 10f32 * unit_range.ind_sample(&mut rng))
+            .map(|_| 10f64 * unit_range.ind_sample(&mut rng))
             .collect();
         unsorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
         unsorted
@@ -72,8 +72,8 @@ fn main() {
     for xval in &x {
         let yerr_val = 0.1 + 0.5 * unit_range.ind_sample(&mut rng);
         let mut y_val = m_true * xval + b_true;
-        y_val += (f_true * y_val).abs() * norm_gen.ind_sample(&mut rng) as f32;
-        y_val += yerr_val * norm_gen.ind_sample(&mut rng) as f32;
+        y_val += (f_true * y_val).abs() * norm_gen.ind_sample(&mut rng) as f64;
+        y_val += yerr_val * norm_gen.ind_sample(&mut rng) as f64;
 
         y.push(y_val);
         yerr.push(yerr_val);
@@ -83,20 +83,20 @@ fn main() {
      * Shortcut the least squares minimisation by starting the sampling
      * from the values found in the documentation
      */
-    let guess = Guess::new(&[-1.003, 4.528, 0.454f32.ln()]);
+    let guess = Guess::new(&[-1.003, 4.528, 0.454f64.ln()]);
 
     /*
      * Define the equivalent of lnprior, lnlike and lnprob (note: lnprob is automatically
      * derived for you by the `Prob` trait, unless custom behaviour is required.
      */
     struct LinearWithUnderestimatedErrors<'a> {
-        x: &'a [f32],
-        y: &'a [f32],
-        e: &'a [f32],
+        x: &'a [f64],
+        y: &'a [f64],
+        e: &'a [f64],
     };
 
     impl<'a> Prob for LinearWithUnderestimatedErrors<'a> {
-        fn lnlike(&self, theta: &Guess) -> f32 {
+        fn lnlike(&self, theta: &Guess) -> f64 {
             assert_eq!(theta.values.len(), 3);
             assert_eq!(self.x.len(), self.y.len());
             assert_eq!(self.y.len(), self.e.len());
@@ -115,7 +115,7 @@ fn main() {
 
         }
 
-        fn lnprior(&self, theta: &Guess) -> f32 {
+        fn lnprior(&self, theta: &Guess) -> f64 {
             assert_eq!(theta.values.len(), 3);
 
             let m = theta[0];
@@ -125,7 +125,7 @@ fn main() {
             if (m > -5.0) && (m < 5.0) && (b > 0.0) && (b < 10.0) && (lnf > -10.0) && (lnf < 1.0) {
                 0.
             } else {
-                -std::f32::INFINITY
+                -std::f64::INFINITY
             }
         }
     }
@@ -169,7 +169,7 @@ fn main() {
     print_marginalised("lnf", &marginalised_posteriors[2], f_true.ln());
 }
 
-fn print_marginalised(name: &str, values: &[f32], truth: f32) {
+fn print_marginalised(name: &str, values: &[f64], truth: f64) {
     println!("{:3} = {:6.3} +{:.3} -{:.3} (truth: {:6.3})",
              name,
              values[1],

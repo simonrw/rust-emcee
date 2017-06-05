@@ -4,7 +4,7 @@ use guess::Guess;
 #[derive(Debug, Default)]
 pub struct Stretch {
     pub q: Vec<Guess>,
-    pub newlnprob: Vec<f32>,
+    pub newlnprob: Vec<f64>,
     pub accept: Vec<bool>,
 }
 

@@ -10,7 +10,7 @@ use guess::Guess;
 ///
 /// Typically, access to any dataset required for fitting is handled through the struct which
 /// implements this trait. By convention, invalid prior results are signaled by returning
-/// [`-std::f32::INFINITY`](https://doc.rust-lang.org/std/f32/constant.INFINITY.html).
+/// [`-std::f64::INFINITY`](https://doc.rust-lang.org/std/f64/constant.INFINITY.html).
 ///
 /// An example for a simple linear model to data with uncertainties:
 ///
@@ -18,13 +18,13 @@ use guess::Guess;
 /// # use emcee::{Prob, Guess};
 /// // lifetimes and slices used for efficiency reasons
 /// struct Foo<'a> {
-///     x: &'a [f32],
-///     y: &'a [f32],
-///     e: &'a [f32], // uncertainties
+///     x: &'a [f64],
+///     y: &'a [f64],
+///     e: &'a [f64], // uncertainties
 /// }
 ///
 /// impl<'a> Prob for Foo<'a> {
-///     fn lnlike(&self, params: &Guess) -> f32 {
+///     fn lnlike(&self, params: &Guess) -> f64 {
 ///         let m = params[0];
 ///         let c = params[1];
 ///
@@ -37,14 +37,14 @@ use guess::Guess;
 ///
 ///     }
 ///
-///     fn lnprior(&self, params: &Guess) -> f32 {
+///     fn lnprior(&self, params: &Guess) -> f64 {
 ///         let m = params[0];
 ///         let c = params[1];
 ///
 ///         if (m > -5.) && (m < 5.) && (c > -10.) && (c < 10.) {
 ///             0.0
 ///         } else {
-///             -std::f32::INFINITY
+///             -std::f64::INFINITY
 ///         }
 ///     }
 /// }
@@ -54,18 +54,18 @@ use guess::Guess;
 /// [`lnprob`](trait.Prob.html#method.lnprob) can be seen in the source code.
 pub trait Prob {
     /// Computes the natural logarithm of the likelihood of a position in parameter space
-    fn lnlike(&self, params: &Guess) -> f32;
+    fn lnlike(&self, params: &Guess) -> f64;
 
     /// Computes the natural logarithm of the prior probability of a position in parameter space
-    fn lnprior(&self, params: &Guess) -> f32;
+    fn lnprior(&self, params: &Guess) -> f64;
 
     /// Computes the natural logarithm of the log posterior probabilities
-    fn lnprob(&self, params: &Guess) -> f32 {
+    fn lnprob(&self, params: &Guess) -> f64 {
         let lnp = self.lnprior(params);
         if lnp.is_finite() {
             lnp + self.lnlike(params)
         } else {
-            -::std::f32::INFINITY
+            -::std::f64::INFINITY
         }
     }
 }

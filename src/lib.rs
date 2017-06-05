@@ -25,34 +25,34 @@
 //! struct Model;
 //!
 //! impl Prob for Model {
-//!     fn lnlike(&self, params: &Guess) -> f32 {
+//!     fn lnlike(&self, params: &Guess) -> f64 {
 //!         // Insert actual implementation here
-//!         0f32
+//!         0f64
 //!     }
 //!
-//!     fn lnprior(&self, params: &Guess) -> f32 {
+//!     fn lnprior(&self, params: &Guess) -> f64 {
 //!         // Insert actual implementation here
-//!         0f32
+//!         0f64
 //!     }
 //! }
 //! ```
 //!
 //! The trait has a default implementation for [`lnprob`][emcee-lnprob] which computes the product
 //! of the likelihood and prior probability (sum in log space) as per Bayes' rule.  Invalid prior
-//! values are marked by returning -[`std::f32::INFINITY`][std-infinity] from the priors function.
+//! values are marked by returning -[`std::f64::INFINITY`][std-infinity] from the priors function.
 //! Note your implementation is likely to need external data. This data should be included with
 //! your `Model` class, for example:
 //!
 //! ```rust
 //! # use emcee::{Guess, Prob};
 //! struct Model<'a> {
-//!     x: &'a [f32],
-//!     y: &'a [f32],
+//!     x: &'a [f64],
+//!     y: &'a [f64],
 //! }
 //!
 //! // Linear model y = m * x + c
 //! impl<'a> Prob for Model<'a> {
-//!     fn lnlike(&self, params: &Guess) -> f32 {
+//!     fn lnlike(&self, params: &Guess) -> f64 {
 //!         let m = params[0];
 //!         let c = params[1];
 //!
@@ -61,12 +61,12 @@
 //!                 let model = m * xval + c;
 //!                 let residual = (yval - model).powf(2.0);
 //!                 residual
-//!             }).sum::<f32>()
+//!             }).sum::<f64>()
 //!     }
 //!
-//!     fn lnprior(&self, params: &Guess) -> f32 {
+//!     fn lnprior(&self, params: &Guess) -> f64 {
 //!         // unimformative priors
-//!         0.0f32
+//!         0.0f64
 //!     }
 //! }
 //!
@@ -80,7 +80,7 @@
 //! ```rust
 //! use emcee::Guess;
 //!
-//! let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
 //! ```
 //!
 //! The sampler implemented by this create uses multiple *walkers*, and as such the initial
@@ -90,7 +90,7 @@
 //!
 //! ```rust
 //! # use emcee::Guess;
-//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
 //! let nwalkers = 100;
 //! let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
 //! assert_eq!(perturbed_guess.len(), nwalkers);
@@ -113,12 +113,12 @@
 //!
 //! // Build a linear model y = m * x + c (see above)
 //! # struct Model<'a> {
-//! #     x: &'a [f32],
-//! #     y: &'a [f32],
+//! #     x: &'a [f64],
+//! #     y: &'a [f64],
 //! # }
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
-//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #     fn lnlike(&self, params: &Guess) -> f64 {
 //! #         let m = params[0];
 //! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
@@ -126,16 +126,16 @@
 //! #                 let model = m * xval + c;
 //! #                 let residual = (yval - model).powf(2.0);
 //! #                 residual
-//! #             }).sum::<f32>()
+//! #             }).sum::<f64>()
 //! #     }
-//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #     fn lnprior(&self, params: &Guess) -> f64 {
 //! #         // unimformative priors
-//! #         0.0f32
+//! #         0.0f64
 //! #     }
 //! # }
 //!
-//! let initial_x = [0.0f32, 1.0f32, 2.0f32];
-//! let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! let initial_x = [0.0f64, 1.0f64, 2.0f64];
+//! let initial_y = [5.0f64, 7.0f64, 9.0f64];
 //!
 //! let model = Model {
 //!     x: &initial_x,
@@ -153,12 +153,12 @@
 //! # let nwalkers = 100;
 //! # let ndim = 2;  // m and c
 //! # struct Model<'a> {
-//! #     x: &'a [f32],
-//! #     y: &'a [f32],
+//! #     x: &'a [f64],
+//! #     y: &'a [f64],
 //! # }
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
-//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #     fn lnlike(&self, params: &Guess) -> f64 {
 //! #         let m = params[0];
 //! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
@@ -166,16 +166,16 @@
 //! #                 let model = m * xval + c;
 //! #                 let residual = (yval - model).powf(2.0);
 //! #                 residual
-//! #             }).sum::<f32>()
+//! #             }).sum::<f64>()
 //! #     }
-//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #     fn lnprior(&self, params: &Guess) -> f64 {
 //! #         // unimformative priors
-//! #         0.0f32
+//! #         0.0f64
 //! #     }
 //! # }
 //! #
-//! # let initial_x = [0.0f32, 1.0f32, 2.0f32];
-//! # let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! # let initial_x = [0.0f64, 1.0f64, 2.0f64];
+//! # let initial_y = [5.0f64, 7.0f64, 9.0f64];
 //! #
 //! # let model = Model {
 //! #     x: &initial_x,
@@ -185,7 +185,7 @@
 //! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //! #     .expect("could not create sampler");
 //! #
-//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
 //! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
 //! let niterations = 100;
 //! sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
@@ -208,12 +208,12 @@
 //! # let nwalkers = 100;
 //! # let ndim = 2;  // m and c
 //! # struct Model<'a> {
-//! #     x: &'a [f32],
-//! #     y: &'a [f32],
+//! #     x: &'a [f64],
+//! #     y: &'a [f64],
 //! # }
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
-//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #     fn lnlike(&self, params: &Guess) -> f64 {
 //! #         let m = params[0];
 //! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
@@ -221,16 +221,16 @@
 //! #                 let model = m * xval + c;
 //! #                 let residual = (yval - model).powf(2.0);
 //! #                 residual
-//! #             }).sum::<f32>()
+//! #             }).sum::<f64>()
 //! #     }
-//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #     fn lnprior(&self, params: &Guess) -> f64 {
 //! #         // unimformative priors
-//! #         0.0f32
+//! #         0.0f64
 //! #     }
 //! # }
 //! #
-//! # let initial_x = [0.0f32, 1.0f32, 2.0f32];
-//! # let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! # let initial_x = [0.0f64, 1.0f64, 2.0f64];
+//! # let initial_y = [5.0f64, 7.0f64, 9.0f64];
 //! #
 //! # let model = Model {
 //! #     x: &initial_x,
@@ -240,7 +240,7 @@
 //! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //! #     .expect("could not create sampler");
 //! #
-//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
 //! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
 //! # let niterations = 100;
 //! sampler.sample(&perturbed_guess, niterations, |step| {
@@ -260,12 +260,12 @@
 //! # let nwalkers = 100;
 //! # let ndim = 2;  // m and c
 //! # struct Model<'a> {
-//! #     x: &'a [f32],
-//! #     y: &'a [f32],
+//! #     x: &'a [f64],
+//! #     y: &'a [f64],
 //! # }
 //! # // Linear model y = m * x + c
 //! # impl<'a> Prob for Model<'a> {
-//! #     fn lnlike(&self, params: &Guess) -> f32 {
+//! #     fn lnlike(&self, params: &Guess) -> f64 {
 //! #         let m = params[0];
 //! #         let c = params[1];
 //! #         -0.5 * self.x.iter().zip(self.y)
@@ -273,16 +273,16 @@
 //! #                 let model = m * xval + c;
 //! #                 let residual = (yval - model).powf(2.0);
 //! #                 residual
-//! #             }).sum::<f32>()
+//! #             }).sum::<f64>()
 //! #     }
-//! #     fn lnprior(&self, params: &Guess) -> f32 {
+//! #     fn lnprior(&self, params: &Guess) -> f64 {
 //! #         // unimformative priors
-//! #         0.0f32
+//! #         0.0f64
 //! #     }
 //! # }
 //! #
-//! # let initial_x = [0.0f32, 1.0f32, 2.0f32];
-//! # let initial_y = [5.0f32, 7.0f32, 9.0f32];
+//! # let initial_x = [0.0f64, 1.0f64, 2.0f64];
+//! # let initial_y = [5.0f64, 7.0f64, 9.0f64];
 //! #
 //! # let model = Model {
 //! #     x: &initial_x,
@@ -292,7 +292,7 @@
 //! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //! #     .expect("could not create sampler");
 //! #
-//! # let initial_guess = Guess::new(&[0.0f32, 0.0f32]);
+//! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
 //! # let perturbed_guess = initial_guess.create_initial_guess(nwalkers);
 //! # let niterations = 100;
 //! # sampler.run_mcmc(&perturbed_guess, niterations).expect("error running sampler");
@@ -314,7 +314,7 @@
 //! [emcee-prob]: trait.Prob.html
 //! [emcee-guess]: struct.Guess.html
 //! [emcee-lnprob]: trait.Prob.html#method.lnprob
-//! [std-infinity]: https://doc.rust-lang.org/std/f32/constant.INFINITY.html
+//! [std-infinity]: https://doc.rust-lang.org/std/f64/constant.INFINITY.html
 //! [emcee-create-initial-guess]: struct.Guess.html#method.create_initial_guess
 //! [emcee-flatchain]: struct.EnsembleSampler.html#method.flatchain
 //! [emcee-sample]: struct.EnsembleSampler.html#method.sample
@@ -362,7 +362,7 @@ pub struct Step<'a> {
     pub pos: &'a [Guess],
 
     /// The log posterior probabilities of the values contained in `pos`, one for each walker
-    pub lnprob: &'a [f32],
+    pub lnprob: &'a [f64],
 
     /// The current iteration number
     pub iteration: usize,
@@ -376,7 +376,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     lnprob: &'a T,
     dim: usize,
     rng: Box<Rng>,
-    proposal_scale: f32,
+    proposal_scale: f64,
     chain: Option<Chain>,
     probstore: Option<ProbStore>,
 
@@ -544,10 +544,10 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     /// Return the number of iterations accepted, one value per walker
-    pub fn acceptance_fraction(&self) -> Vec<f32> {
+    pub fn acceptance_fraction(&self) -> Vec<f64> {
         self.naccepted
             .iter()
-            .map(|naccepted| *naccepted as f32 / self.iterations as f32)
+            .map(|naccepted| *naccepted as f64 / self.iterations as f64)
             .collect()
     }
 
@@ -559,23 +559,23 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
     // Internal functions
 
-    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f32]) -> Result<Stretch> {
+    fn propose_stretch(&mut self, p0: &[Guess], p1: &[Guess], lnprob0: &[f64]) -> Result<Stretch> {
         assert_eq!(p0.len() + p1.len(), self.nwalkers);
         let s = p0;
         let c = p1;
         let ns = s.len();
         let nc = c.len();
 
-        // let z_range = Range::new(1.0f32, 2.0f32);
+        // let z_range = Range::new(1.0f64, 2.0f64);
         let rint_range = Range::new(0usize, nc);
-        let unit_range = Range::new(0f32, 1f32);
+        let unit_range = Range::new(0f64, 1f64);
 
         let mut q = Vec::with_capacity(ns);
         let mut all_zz = Vec::with_capacity(ns);
         for sval in s {
             let zz = ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) +
-                      1.0f32)
-                    .powf(2.0f32) / self.proposal_scale;
+                      1.0f64)
+                    .powf(2.0f64) / self.proposal_scale;
             let rint = rint_range.ind_sample(&mut self.rng);
 
             let mut values = Vec::with_capacity(self.dim);
@@ -598,7 +598,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
         for i in 0..ns {
             assert!(all_zz[i] > 0.);
-            let lnpdiff = (self.dim as f32 - 1.0) * all_zz[i].ln() + out.newlnprob[i] - lnprob0[i];
+            let lnpdiff = (self.dim as f64 - 1.0) * all_zz[i].ln() + out.newlnprob[i] - lnprob0[i];
             let test_value = unit_range.ind_sample(&mut self.rng).ln();
 
             if lnpdiff > test_value {
@@ -608,7 +608,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         Ok(out)
     }
 
-    fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f32>> {
+    fn get_lnprob(&mut self, p: &[Guess]) -> Result<Vec<f64>> {
         let mut lnprobs = Vec::with_capacity(p.len());
         for guess in p {
             if guess.contains_infs() {
@@ -634,32 +634,32 @@ mod tests {
     use rand::distributions::Normal;
     use super::*;
 
-    const REAL_M: f32 = 2.0f32;
-    const REAL_C: f32 = 5.0f32;
+    const REAL_M: f64 = 2.0f64;
+    const REAL_C: f64 = 5.0f64;
 
     struct LinearModel<'a> {
-        x: &'a [f32],
-        y: &'a [f32],
+        x: &'a [f64],
+        y: &'a [f64],
     }
 
     impl<'a> LinearModel<'a> {
-        fn new(x: &'a [f32], y: &'a [f32]) -> Self {
+        fn new(x: &'a [f64], y: &'a [f64]) -> Self {
             LinearModel { x, y }
         }
     }
 
     impl<'a> Prob for LinearModel<'a> {
-        fn lnprior(&self, _params: &Guess) -> f32 {
-            0.0f32
+        fn lnprior(&self, _params: &Guess) -> f64 {
+            0.0f64
         }
 
-        fn lnlike(&self, params: &Guess) -> f32 {
+        fn lnlike(&self, params: &Guess) -> f64 {
             let m = params[0];
             let c = params[1];
             let sum = self.x
                 .iter()
                 .zip(self.y)
-                .fold(0.0f32, |acc, (x, y)| {
+                .fold(0.0f64, |acc, (x, y)| {
                     let model_value = m * x + c;
                     let residual = y - model_value;
                     acc + residual.powf(2.0)
@@ -670,20 +670,20 @@ mod tests {
 
 
     struct MultivariateProb<'a> {
-        icov: &'a [[f32; 5]; 5],
+        icov: &'a [[f64; 5]; 5],
     }
 
     impl<'a> Prob for MultivariateProb<'a> {
         // Stub methods as they are not used
-        fn lnlike(&self, _params: &Guess) -> f32 {
-            0.0f32
+        fn lnlike(&self, _params: &Guess) -> f64 {
+            0.0f64
         }
-        fn lnprior(&self, _params: &Guess) -> f32 {
-            0.0f32
+        fn lnprior(&self, _params: &Guess) -> f64 {
+            0.0f64
         }
 
-        fn lnprob(&self, params: &Guess) -> f32 {
-            let mut values = [0f32; 5];
+        fn lnprob(&self, params: &Guess) -> f64 {
+            let mut values = [0f64; 5];
             for (i, value) in params.values.iter().enumerate() {
                 values[i] = *value;
             }
@@ -771,7 +771,7 @@ mod tests {
         let nwalkers = 8;
         let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
         let lnprob = sampler.get_lnprob(&pos).unwrap();
-        let expected: Vec<f32> = vec![-4613.19497084, -4613.277985, -4613.25381092, -4613.1954303];
+        let expected: Vec<f64> = vec![-4613.19497084, -4613.277985, -4613.25381092, -4613.1954303];
         for (a, b) in lnprob.iter().zip(expected) {
             /*
              * TODO: this is quite a wide tolerance which makes the test pass, but needs tweaking.
@@ -780,7 +780,7 @@ mod tests {
              *   precise
              *   enough to give the correct level of precision
              */
-            assert_approx_eq!(a, b, 0.05f32);
+            assert_approx_eq!(a, b, 0.05f64);
         }
     }
 
@@ -790,14 +790,14 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
-        let expected = -4613.202966359966f32;
+        let expected = -4613.202966359966f64;
         assert_approx_eq!(foo.lnprob(&p0), expected);
     }
 
     #[test]
     fn test_propose_stretch() {
         let nwalkers = 100;
-        let p0 = Guess { values: vec![2.0f32, 5.0f32] };
+        let p0 = Guess { values: vec![2.0f64, 5.0f64] };
 
         let pos = p0.create_initial_guess(nwalkers);
         let (real_x, observed_y) = load_baked_dataset();
@@ -816,7 +816,7 @@ mod tests {
     #[test]
     fn test_mcmc_run() {
         let nwalkers = 20;
-        let p0 = Guess { values: vec![0f32, 0f32] };
+        let p0 = Guess { values: vec![0f64, 0f64] };
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
@@ -829,8 +829,8 @@ mod tests {
 
         if let Some(ref chain) = sampler.chain {
             /* Wide margins due to random numbers :( */
-            assert_approx_eq!(chain.get(0, 0, niters - 2), 2.0f32, 1.0f32);
-            assert_approx_eq!(chain.get(1, 0, niters - 2), 5.0f32, 1.0f32);
+            assert_approx_eq!(chain.get(0, 0, niters - 2), 2.0f64, 1.0f64);
+            assert_approx_eq!(chain.get(1, 0, niters - 2), 5.0f64, 1.0f64);
         }
     }
 
@@ -894,14 +894,14 @@ mod tests {
 
         for (guess, expected) in guesses.iter().zip(expecteds) {
             let p = MultivariateProb { icov: (&icov) };
-            assert_approx_eq!(p.lnprob(&guess), expected);
+            assert_approx_eq!(p.lnprob(&guess), expected, 1E-4);
         }
     }
 
     #[test]
     fn test_not_storing_chain() {
         let nwalkers = 20;
-        let p0 = Guess { values: vec![0f32, 0f32] };
+        let p0 = Guess { values: vec![0f64, 0f64] };
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
@@ -918,7 +918,7 @@ mod tests {
     #[test]
     fn test_thinning() {
         let nwalkers = 20;
-        let p0 = Guess { values: vec![0f32, 0f32] };
+        let p0 = Guess { values: vec![0f64, 0f64] };
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
@@ -971,7 +971,7 @@ mod tests {
             .map(|_| {
                      Guess {
                          values: (0..ndim)
-                             .map(|_| 0.1f32 * norm_range.ind_sample(&mut rng) as f32)
+                             .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
                              .collect(),
                      }
                  })
@@ -993,7 +993,7 @@ mod tests {
 
         // Check the acceptance fraction
         let acceptance_fraction = sampler.acceptance_fraction();
-        assert!(acceptance_fraction.iter().sum::<f32>() / acceptance_fraction.len() as f32 > 0.25);
+        assert!(acceptance_fraction.iter().sum::<f64>() / acceptance_fraction.len() as f64 > 0.25);
 
         let mut invalid_walkers = Vec::new();
 
@@ -1001,11 +1001,11 @@ mod tests {
         #[derive(Debug)]
         struct I {
             idx: usize,
-            fraction: f32,
+            fraction: f64,
         }
 
         for (i, fraction) in acceptance_fraction.iter().enumerate() {
-            if *fraction == 0.0f32 {
+            if *fraction == 0.0f64 {
                 invalid_walkers.push(I {
                                          idx: i,
                                          fraction: *fraction,
@@ -1022,16 +1022,16 @@ mod tests {
                 split.1);
 
         // Check the chain
-        let mut result = Guess { values: vec![0.0f32; sampler.dim] };
+        let mut result = Guess { values: vec![0.0f64; sampler.dim] };
 
         for i in 0..sampler.nwalkers * niter {
             for j in 0..sampler.dim {
-                result[j] += (chain[i][j] / niter as f32).powf(2.0);
+                result[j] += (chain[i][j] / niter as f64).powf(2.0);
             }
         }
 
         for value in result.values {
-            assert!((value / niter as f32).powf(2.0) < maxdiff,
+            assert!((value / niter as f64).powf(2.0) < maxdiff,
                     "value: {}, maxdiff: {}",
                     value,
                     maxdiff);
@@ -1039,15 +1039,15 @@ mod tests {
     }
 
     fn create_guess() -> Guess {
-        Guess { values: vec![0.0f32, 0.0f32] }
+        Guess { values: vec![0.0f64, 0.0f64] }
     }
 
-    fn load_baked_dataset() -> (Vec<f32>, Vec<f32>) {
-        let real_x: Vec<f32> = vec![0.20584494, 0.58083612, 1.5599452, 1.5601864, 1.81824967,
+    fn load_baked_dataset() -> (Vec<f64>, Vec<f64>) {
+        let real_x: Vec<f64> = vec![0.20584494, 0.58083612, 1.5599452, 1.5601864, 1.81824967,
                                     1.8340451, 2.12339111, 2.9122914, 3.04242243, 3.74540119,
                                     4.31945019, 5.24756432, 5.98658484, 6.01115012, 7.08072578,
                                     7.31993942, 8.32442641, 8.66176146, 9.50714306, 9.69909852];
-        let observed_y: Vec<f32> = vec![4.39885877,
+        let observed_y: Vec<f64> = vec![4.39885877,
                                         6.47591958,
                                         7.21186633,
                                         6.70806911,
@@ -1070,26 +1070,26 @@ mod tests {
         (real_x, observed_y)
     }
 
-    fn generate_dataset(size: usize) -> (Vec<f32>, Vec<f32>) {
+    fn generate_dataset(size: usize) -> (Vec<f64>, Vec<f64>) {
         use rand::distributions::Normal;
 
         let mut rng = rand::thread_rng();
-        let x_range = Range::new(0f32, 10f32);
+        let x_range = Range::new(0f64, 10f64);
         let norm_range = Normal::new(0.0, 3.0);
 
-        let mut real_x: Vec<f32> = (0..size).map(|_| x_range.ind_sample(&mut rng)).collect();
+        let mut real_x: Vec<f64> = (0..size).map(|_| x_range.ind_sample(&mut rng)).collect();
         real_x.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-        let real_y: Vec<f32> = real_x.iter().map(|x| REAL_M * x + REAL_C).collect();
-        let observed_y: Vec<f32> = real_y
+        let real_y: Vec<f64> = real_x.iter().map(|x| REAL_M * x + REAL_C).collect();
+        let observed_y: Vec<f64> = real_y
             .iter()
-            .map(|y| y + norm_range.ind_sample(&mut rng) as f32)
+            .map(|y| y + norm_range.ind_sample(&mut rng) as f64)
             .collect();
         (real_x, observed_y)
     }
 
-    fn mat_vec_mul(m: &[[f32; 5]; 5], v: &[f32; 5]) -> [f32; 5] {
-        let mut out = [0.0f32; 5];
+    fn mat_vec_mul(m: &[[f64; 5]; 5], v: &[f64; 5]) -> [f64; 5] {
+        let mut out = [0.0f64; 5];
 
         for i in 0..5 {
             out[i] = v[0] * m[i][0] + v[1] * m[i][1] + v[2] * m[i][2] + v[3] * m[i][3] +
@@ -1099,8 +1099,8 @@ mod tests {
         out
     }
 
-    fn vec_vec_mul(v1: &[f32; 5], v2: &[f32; 5]) -> f32 {
-        let mut out = 0.0f32;
+    fn vec_vec_mul(v1: &[f64; 5], v2: &[f64; 5]) -> f64 {
+        let mut out = 0.0f64;
         for i in 0..5 {
             out += v1[i] * v2[i];
         }
@@ -1109,20 +1109,20 @@ mod tests {
 
     #[test]
     fn test_mat_vec_mul() {
-        let v = [1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32];
-        let mat = [[1.0f32, 0.0f32, 0.0f32, 5.0f32, 0.0f32],
-                   [0.0f32, 1.0f32, 0.0f32, 0.0f32, 0.0f32],
-                   [0.0f32, 0.0f32, 1.0f32, 0.0f32, 0.0f32],
-                   [0.0f32, 0.0f32, 0.0f32, 1.0f32, 0.0f32],
-                   [0.0f32, 0.0f32, 0.0f32, 0.0f32, 1.0f32]];
+        let v = [1.0f64, 2.0f64, 3.0f64, 4.0f64, 5.0f64];
+        let mat = [[1.0f64, 0.0f64, 0.0f64, 5.0f64, 0.0f64],
+                   [0.0f64, 1.0f64, 0.0f64, 0.0f64, 0.0f64],
+                   [0.0f64, 0.0f64, 1.0f64, 0.0f64, 0.0f64],
+                   [0.0f64, 0.0f64, 0.0f64, 1.0f64, 0.0f64],
+                   [0.0f64, 0.0f64, 0.0f64, 0.0f64, 1.0f64]];
         let result = mat_vec_mul(&mat, &v);
-        assert_eq!(result, [21.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32]);
+        assert_eq!(result, [21.0f64, 2.0f64, 3.0f64, 4.0f64, 5.0f64]);
     }
 
     #[test]
     fn test_vec_vec_mul() {
-        let v = [1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32];
+        let v = [1.0f64, 2.0f64, 3.0f64, 4.0f64, 5.0f64];
         let result = vec_vec_mul(&v, &v);
-        assert_eq!(result, 55.0f32);
+        assert_eq!(result, 55.0f64);
     }
 }
