@@ -773,14 +773,7 @@ mod tests {
         let lnprob = sampler.get_lnprob(&pos).unwrap();
         let expected: Vec<f64> = vec![-4613.19497084, -4613.277985, -4613.25381092, -4613.1954303];
         for (a, b) in lnprob.iter().zip(expected) {
-            /*
-             * TODO: this is quite a wide tolerance which makes the test pass, but needs tweaking.
-             * Perhaps something is wrong with the algorithm itself
-             * - perhaps the quoted floats copied from the printing of the python script are not
-             *   precise
-             *   enough to give the correct level of precision
-             */
-            assert_approx_eq!(a, b, 0.05f64);
+            assert_approx_eq!(a, b);
         }
     }
 
