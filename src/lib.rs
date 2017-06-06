@@ -375,7 +375,6 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     lnprob: &'a T,
     dim: usize,
     proposal_scale: f64,
-    initial_state: Option<Step<'a>>,
 
     // Mutable members
     rng: RefCell<Box<Rng>>,
@@ -383,6 +382,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     iterations: RefCell<usize>,
     chain: RefCell<Option<Chain>>,
     probstore: RefCell<Option<ProbStore>>,
+    initial_state: RefCell<Option<Step<'a>>>,
 
     /// Allow disabling of storing the chain
     storechain: bool,
@@ -423,7 +423,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                probstore: RefCell::new(None),
                storechain: true,
                thin: 1,
-               initial_state: None,
+               initial_state: RefCell::new(None),
            })
     }
 
@@ -448,12 +448,12 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         where F: FnMut(Step)
     {
 
-        let mut p = match self.initial_state {
+        let mut p = match *self.initial_state.borrow() {
             None => params.to_owned(),
             Some(ref state) => state.pos.clone().into_owned(),
         };
 
-        let mut lnprob = match self.initial_state {
+        let mut lnprob = match *self.initial_state.borrow() {
             None => self.get_lnprob(&p)?,
             Some(ref state) => state.lnprob.clone().into_owned(),
         };
@@ -559,8 +559,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
 
     /// Set the initial state of the sampler
-    pub fn set_initial_state(&mut self, state0: Step<'a>) -> &Self {
-        self.initial_state = Some(state0);
+    pub fn set_initial_state(&self, state0: Step<'a>) -> &Self {
+        *self.initial_state.borrow_mut() = Some(state0);
         self
     }
 
@@ -779,7 +779,7 @@ mod tests {
 
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
 
         let params = p0.create_initial_guess(nwalkers);
