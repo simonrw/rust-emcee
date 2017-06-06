@@ -449,8 +449,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     {
 
         // Take a copy of the params vector to mutate
-        let mut lnprob = self.get_lnprob(params)?;
         let mut p = params.to_owned();
+        let mut lnprob = self.get_lnprob(&p)?;
+
         let halfk = self.nwalkers / 2;
 
         if lnprob.iter().any(|val| val.is_nan()) {
