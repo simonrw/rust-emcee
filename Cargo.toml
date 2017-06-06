@@ -9,7 +9,7 @@ license = "MIT"
 name = "emcee"
 readme = "README.md"
 repository = "https://github.com/mindriot101/rust-emcee"
-version = "0.3.0"
+version = "1.0.0-alpha.1"
 
 [badges]
 
