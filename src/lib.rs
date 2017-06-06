@@ -469,6 +469,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             *self.probstore.borrow_mut() = Some(ProbStore::new(self.nwalkers, iterations));
         }
 
+        self.naccepted.borrow_mut().resize(self.nwalkers, 0);
+
         for iteration in 0..iterations {
 
             for ensemble_idx in 0..2 {
@@ -583,9 +585,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     /// Return the sampler to its default state
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         *self.iterations.borrow_mut() = 0;
         self.naccepted.borrow_mut().resize(0, 0);
+        *self.chain.borrow_mut() = None;
+        *self.probstore.borrow_mut() = None;
     }
 
     // Internal functions
@@ -793,6 +797,28 @@ mod tests {
 
         sampler
             .set_initial_state(initial_state)
+            .run_mcmc(&params, niters)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_restart_sampler() {
+        let (real_x, observed_y) = generate_dataset(20);
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
+
+        let nwalkers = 10;
+        let niters = 100;
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+
+
+        let params = p0.create_initial_guess(nwalkers);
+
+        let state = sampler.run_mcmc(&params, niters).unwrap();
+
+        sampler.reset();
+        sampler
+            .set_initial_state(state)
             .run_mcmc(&params, niters)
             .unwrap();
     }
