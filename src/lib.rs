@@ -370,12 +370,12 @@ pub struct Step<'a> {
 }
 
 /// Affine-invariant Markov-chain Monte Carlo sampler
-pub struct EnsembleSampler<'a, 'b, T: Prob + 'a> {
+pub struct EnsembleSampler<'a, T: Prob + 'a> {
     nwalkers: usize,
     lnprob: &'a T,
     dim: usize,
     proposal_scale: f64,
-    initial_state: Option<&'b Step<'b>>,
+    initial_state: Option<Step<'a>>,
 
     // Mutable members
     rng: RefCell<Box<Rng>>,
@@ -391,7 +391,7 @@ pub struct EnsembleSampler<'a, 'b, T: Prob + 'a> {
     pub thin: usize,
 }
 
-impl<'a, 'b, T: Prob + 'a> EnsembleSampler<'a, 'b, T> {
+impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// Create a new `EnsembleSampler`
     ///
     /// Errors are handled by returning a [`Result`](errors/type.Result.html) which contains
@@ -552,7 +552,7 @@ impl<'a, 'b, T: Prob + 'a> EnsembleSampler<'a, 'b, T> {
 
 
     /// Set the initial state of the sampler
-    pub fn set_initial_state(&mut self, state0: &'b Step) -> &Self {
+    pub fn set_initial_state(&mut self, state0: Step<'a>) -> &Self {
         self.initial_state = Some(state0);
         self
     }
@@ -762,6 +762,32 @@ mod tests {
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.run_mcmc(&params, niters).unwrap();
+    }
+
+    #[test]
+    fn test_with_initial_state() {
+        let (real_x, observed_y) = generate_dataset(20);
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
+
+        let nwalkers = 10;
+        let niters = 100;
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+
+
+        let params = p0.create_initial_guess(nwalkers);
+        let lnprob0: Vec<_> = params.iter().map(|val| foo.lnprob(val)).collect();
+
+        let initial_state = Step {
+            pos: Cow::Owned(params.clone()),
+            lnprob: Cow::Owned(lnprob0.clone()),
+            iteration: 0,
+        };
+
+        sampler
+            .set_initial_state(initial_state)
+            .run_mcmc(&params, niters)
+            .unwrap();
     }
 
     #[test]
@@ -1006,9 +1032,9 @@ mod tests {
     }
 
     // Test helper functions
-    fn check_sampler<'a, 'b, T: Prob + 'a>(sampler: &EnsembleSampler<'a, 'b, T>,
-                                           niter: usize,
-                                           p0: &[Guess]) {
+    fn check_sampler<'a, T: Prob + 'a>(sampler: &EnsembleSampler<'a, T>,
+                                       niter: usize,
+                                       p0: &[Guess]) {
         let _ = sampler.run_mcmc(&p0, niter).unwrap();
 
         let chain = sampler.flatchain().unwrap();
