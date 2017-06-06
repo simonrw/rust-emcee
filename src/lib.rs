@@ -334,6 +334,7 @@ mod prob;
 mod stretch;
 mod stores;
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use rand::{StdRng, Rng, SeedableRng};
 use rand::distributions::{Range, IndependentSample};
@@ -359,10 +360,10 @@ use stores::{Chain, ProbStore};
 #[derive(Debug)]
 pub struct Step<'a> {
     /// The current list of parameters, one for each walker
-    pub pos: &'a [Guess],
+    pub pos: Cow<'a, [Guess]>,
 
     /// The log posterior probabilities of the values contained in `pos`, one for each walker
-    pub lnprob: &'a [f64],
+    pub lnprob: Cow<'a, [f64]>,
 
     /// The current iteration number
     pub iteration: usize,
@@ -381,6 +382,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     iterations: RefCell<usize>,
     chain: RefCell<Option<Chain>>,
     probstore: RefCell<Option<ProbStore>>,
+    initial_state: RefCell<Option<Step<'a>>>,
 
     /// Allow disabling of storing the chain
     storechain: bool,
@@ -421,6 +423,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
                probstore: RefCell::new(None),
                storechain: true,
                thin: 1,
+               initial_state: RefCell::new(None),
            })
     }
 
@@ -441,13 +444,20 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// calling site.
     ///
     /// [step]: struct.Step.html
-    pub fn sample<F>(&self, params: &[Guess], iterations: usize, mut callback: F) -> Result<()>
+    pub fn sample<F>(&self, params: &[Guess], iterations: usize, mut callback: F) -> Result<Step>
         where F: FnMut(Step)
     {
 
-        // Take a copy of the params vector to mutate
-        let mut lnprob = self.get_lnprob(params)?;
-        let mut p = params.to_owned();
+        let mut p = match *self.initial_state.borrow() {
+            None => params.to_owned(),
+            Some(ref state) => state.pos.clone().into_owned(),
+        };
+
+        let mut lnprob = match *self.initial_state.borrow() {
+            None => self.get_lnprob(&p)?,
+            Some(ref state) => state.lnprob.clone().into_owned(),
+        };
+
         let halfk = self.nwalkers / 2;
 
         if lnprob.iter().any(|val| val.is_nan()) {
@@ -458,6 +468,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             *self.chain.borrow_mut() = Some(Chain::new(self.dim, self.nwalkers, iterations));
             *self.probstore.borrow_mut() = Some(ProbStore::new(self.nwalkers, iterations));
         }
+
+        self.naccepted.borrow_mut().resize(self.nwalkers, 0);
 
         for iteration in 0..iterations {
 
@@ -520,8 +532,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             }
 
             let step = Step {
-                pos: &p,
-                lnprob: &lnprob,
+                pos: Cow::Borrowed(&p),
+                lnprob: Cow::Borrowed(&lnprob),
                 iteration: iteration,
             };
 
@@ -530,15 +542,28 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             *self.iterations.borrow_mut() += 1;
         }
 
-        Ok(())
+        let step = Step {
+            pos: Cow::Owned(p),
+            lnprob: Cow::Owned(lnprob),
+            iteration: iterations - 1,
+        };
+
+        Ok(step)
     }
 
     /// Run the sampling
     ///
     /// This runs the sampler for `niterations` iterations. Errors are signalled by the function
     /// returning a `Result`
-    pub fn run_mcmc(&self, p0: &[Guess], niterations: usize) -> Result<()> {
+    pub fn run_mcmc(&self, p0: &[Guess], niterations: usize) -> Result<Step> {
         self.sample(p0, niterations, |_step| {})
+    }
+
+
+    /// Set the initial state of the sampler
+    pub fn set_initial_state(&self, state0: Step<'a>) -> &Self {
+        *self.initial_state.borrow_mut() = Some(state0);
+        self
     }
 
     /// Return the samples as computed by the sampler
@@ -560,9 +585,11 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     }
 
     /// Return the sampler to its default state
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         *self.iterations.borrow_mut() = 0;
         self.naccepted.borrow_mut().resize(0, 0);
+        *self.chain.borrow_mut() = None;
+        *self.probstore.borrow_mut() = None;
     }
 
     // Internal functions
@@ -746,6 +773,54 @@ mod tests {
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.run_mcmc(&params, niters).unwrap();
+    }
+
+    #[test]
+    fn test_with_initial_state() {
+        let (real_x, observed_y) = generate_dataset(20);
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
+
+        let nwalkers = 10;
+        let niters = 100;
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+
+
+        let params = p0.create_initial_guess(nwalkers);
+        let lnprob0: Vec<_> = params.iter().map(|val| foo.lnprob(val)).collect();
+
+        let initial_state = Step {
+            pos: Cow::Owned(params.clone()),
+            lnprob: Cow::Owned(lnprob0.clone()),
+            iteration: 0,
+        };
+
+        sampler
+            .set_initial_state(initial_state)
+            .run_mcmc(&params, niters)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_restart_sampler() {
+        let (real_x, observed_y) = generate_dataset(20);
+        let foo = LinearModel::new(&real_x, &observed_y);
+        let p0 = create_guess();
+
+        let nwalkers = 10;
+        let niters = 100;
+        let sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
+
+
+        let params = p0.create_initial_guess(nwalkers);
+
+        let state = sampler.run_mcmc(&params, niters).unwrap();
+
+        sampler.reset();
+        sampler
+            .set_initial_state(state)
+            .run_mcmc(&params, niters)
+            .unwrap();
     }
 
     #[test]
