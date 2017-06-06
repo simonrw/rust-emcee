@@ -448,9 +448,15 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         where F: FnMut(Step)
     {
 
-        // Take a copy of the params vector to mutate
-        let mut p = params.to_owned();
-        let mut lnprob = self.get_lnprob(&p)?;
+        let mut p = match self.initial_state {
+            None => params.to_owned(),
+            Some(ref state) => state.pos.clone().into_owned(),
+        };
+
+        let mut lnprob = match self.initial_state {
+            None => self.get_lnprob(&p)?,
+            Some(ref state) => state.lnprob.clone().into_owned(),
+        };
 
         let halfk = self.nwalkers / 2;
 
