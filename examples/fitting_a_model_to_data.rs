@@ -143,7 +143,7 @@ fn main() {
     let nwalkers = 100;
     let pos = guess.create_initial_guess_with_rng(nwalkers, &mut rng);
 
-    let sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model).expect("creating sampler");
+    let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model).expect("creating sampler");
     sampler.seed(&[42]);
     sampler.run_mcmc(&pos, 500).unwrap();
 
