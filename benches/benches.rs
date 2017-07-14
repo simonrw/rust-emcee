@@ -90,7 +90,7 @@ mod benchmarks {
             })
             .collect();
 
-        let sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
+        let mut sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
         sampler.seed(&[1]);
 
         // Now run the benchmark
