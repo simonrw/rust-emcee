@@ -44,10 +44,11 @@ impl Guess {
     /// For example, providing a random number generator that has been seeded causes re-creatable
     /// results. The random number generator must come from the [`rand`](https://docs.rs/rand)
     /// crate.
-    pub fn create_initial_guess_with_rng<T: Rng>(&self,
-                                                 nwalkers: usize,
-                                                 mut rng: &mut T)
-                                                 -> Vec<Guess> {
+    pub fn create_initial_guess_with_rng<T: Rng>(
+        &self,
+        nwalkers: usize,
+        mut rng: &mut T,
+    ) -> Vec<Guess> {
         (0..nwalkers)
             .map(|_| self.perturb_with_rng(&mut rng))
             .collect()

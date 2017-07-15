@@ -402,7 +402,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// number of parameters
     pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Result<Self> {
         if nwalkers % 2 != 0 {
-            return Err(EmceeError::InvalidInputs("the number of walkers must be even".into()));
+            return Err(EmceeError::InvalidInputs(
+                "the number of walkers must be even".into(),
+            ));
         }
 
         if nwalkers <= 2 * dim {
@@ -412,19 +414,19 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         }
 
         Ok(EnsembleSampler {
-               nwalkers: nwalkers,
-               iterations: RefCell::new(0),
-               lnprob: lnprob,
-               dim: dim,
-               naccepted: RefCell::new(vec![0; nwalkers]),
-               rng: RefCell::new(Box::new(rand::thread_rng())),
-               proposal_scale: 2.0,
-               chain: RefCell::new(None),
-               probstore: RefCell::new(None),
-               storechain: true,
-               thin: 1,
-               initial_state: RefCell::new(None),
-           })
+            nwalkers: nwalkers,
+            iterations: RefCell::new(0),
+            lnprob: lnprob,
+            dim: dim,
+            naccepted: RefCell::new(vec![0; nwalkers]),
+            rng: RefCell::new(Box::new(rand::thread_rng())),
+            proposal_scale: 2.0,
+            chain: RefCell::new(None),
+            probstore: RefCell::new(None),
+            storechain: true,
+            thin: 1,
+            initial_state: RefCell::new(None),
+        })
     }
 
     /// Swap the built in random number generator for a seedable one
@@ -445,7 +447,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     ///
     /// [step]: struct.Step.html
     pub fn sample<F>(&self, params: &[Guess], iterations: usize, mut callback: F) -> Result<Step>
-        where F: FnMut(Step)
+    where
+        F: FnMut(Step),
     {
 
         let mut p = match *self.initial_state.borrow() {
@@ -580,7 +583,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         self.naccepted
             .borrow()
             .iter()
-            .map(|naccepted| *naccepted as f64 / *self.iterations.borrow() as f64)
+            .map(|naccepted| {
+                *naccepted as f64 / *self.iterations.borrow() as f64
+            })
             .collect()
     }
 
@@ -609,9 +614,9 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let mut all_zz = Vec::with_capacity(ns);
         for sval in s {
             let zz = ((self.proposal_scale - 1.0) *
-                      unit_range.ind_sample(&mut *self.rng.borrow_mut()) +
-                      1.0f64)
-                    .powf(2.0f64) / self.proposal_scale;
+                          unit_range.ind_sample(&mut *self.rng.borrow_mut()) +
+                          1.0f64)
+                .powf(2.0f64) / self.proposal_scale;
             let rint = rint_range.ind_sample(&mut *self.rng.borrow_mut());
 
             let mut values = Vec::with_capacity(self.dim);
@@ -692,14 +697,11 @@ mod tests {
         fn lnlike(&self, params: &Guess) -> f64 {
             let m = params[0];
             let c = params[1];
-            let sum = self.x
-                .iter()
-                .zip(self.y)
-                .fold(0.0f64, |acc, (x, y)| {
-                    let model_value = m * x + c;
-                    let residual = y - model_value;
-                    acc + residual.powf(2.0)
-                });
+            let sum = self.x.iter().zip(self.y).fold(0.0f64, |acc, (x, y)| {
+                let model_value = m * x + c;
+                let residual = y - model_value;
+                acc + residual.powf(2.0)
+            });
             -sum
         }
     }
@@ -939,35 +941,49 @@ mod tests {
     #[test]
     fn test_lnprob_gaussian() {
         // Testing the probability model for the multivariate test
-        let icov = [[318.92634269,
-                     531.39511426,
-                     -136.10315845,
-                     154.17685545,
-                     552.308813],
-                    [531.39511426,
-                     899.91793286,
-                     -224.74333441,
-                     258.98686842,
-                     938.32014715],
-                    [-136.10315845,
-                     -224.74333441,
-                     60.61145495,
-                     -66.68898448,
-                     -232.52035701],
-                    [154.17685545,
-                     258.98686842,
-                     -66.68898448,
-                     83.9979827,
-                     266.44429402],
-                    [552.308813,
-                     938.32014715,
-                     -232.52035701,
-                     266.44429402,
-                     983.33032073]];
+        let icov = [
+            [
+                318.92634269,
+                531.39511426,
+                -136.10315845,
+                154.17685545,
+                552.308813,
+            ],
+            [
+                531.39511426,
+                899.91793286,
+                -224.74333441,
+                258.98686842,
+                938.32014715,
+            ],
+            [
+                -136.10315845,
+                -224.74333441,
+                60.61145495,
+                -66.68898448,
+                -232.52035701,
+            ],
+            [
+                154.17685545,
+                258.98686842,
+                -66.68898448,
+                83.9979827,
+                266.44429402,
+            ],
+            [
+                552.308813,
+                938.32014715,
+                -232.52035701,
+                266.44429402,
+                983.33032073,
+            ],
+        ];
 
-        let guesses = &[Guess::new(&[5., 5., 5., 5., 5.]),
-                        Guess::new(&[5., 5., 5., 5., 9.]),
-                        Guess::new(&[5., 120., 5., 5., 9.])];
+        let guesses = &[
+            Guess::new(&[5., 5., 5., 5., 5.]),
+            Guess::new(&[5., 5., 5., 5., 9.]),
+            Guess::new(&[5., 120., 5., 5., 9.]),
+        ];
         let expecteds = &[-80374.2068729, -138398.513797, -7902962.23125];
 
         for (guess, expected) in guesses.iter().zip(expecteds) {
@@ -1020,43 +1036,55 @@ mod tests {
         let ndim = 5;
         let niter = 1000;
 
-        let icov = [[318.92634269,
-                     531.39511426,
-                     -136.10315845,
-                     154.17685545,
-                     552.308813],
-                    [531.39511426,
-                     899.91793286,
-                     -224.74333441,
-                     258.98686842,
-                     938.32014715],
-                    [-136.10315845,
-                     -224.74333441,
-                     60.61145495,
-                     -66.68898448,
-                     -232.52035701],
-                    [154.17685545,
-                     258.98686842,
-                     -66.68898448,
-                     83.9979827,
-                     266.44429402],
-                    [552.308813,
-                     938.32014715,
-                     -232.52035701,
-                     266.44429402,
-                     983.33032073]];
+        let icov = [
+            [
+                318.92634269,
+                531.39511426,
+                -136.10315845,
+                154.17685545,
+                552.308813,
+            ],
+            [
+                531.39511426,
+                899.91793286,
+                -224.74333441,
+                258.98686842,
+                938.32014715,
+            ],
+            [
+                -136.10315845,
+                -224.74333441,
+                60.61145495,
+                -66.68898448,
+                -232.52035701,
+            ],
+            [
+                154.17685545,
+                258.98686842,
+                -66.68898448,
+                83.9979827,
+                266.44429402,
+            ],
+            [
+                552.308813,
+                938.32014715,
+                -232.52035701,
+                266.44429402,
+                983.33032073,
+            ],
+        ];
         let model = MultivariateProb { icov: &icov };
 
         let norm_range = Normal::new(0.0f64, 1.0f64);
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let p0: Vec<_> = (0..nwalkers)
             .map(|_| {
-                     Guess {
-                         values: (0..ndim)
-                             .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
-                             .collect(),
-                     }
-                 })
+                Guess {
+                    values: (0..ndim)
+                        .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
+                        .collect(),
+                }
+            })
             .collect();
 
         let sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
@@ -1065,9 +1093,11 @@ mod tests {
     }
 
     // Test helper functions
-    fn check_sampler<'a, T: Prob + 'a>(sampler: &EnsembleSampler<'a, T>,
-                                       niter: usize,
-                                       p0: &[Guess]) {
+    fn check_sampler<'a, T: Prob + 'a>(
+        sampler: &EnsembleSampler<'a, T>,
+        niter: usize,
+        p0: &[Guess],
+    ) {
         let _ = sampler.run_mcmc(&p0, niter).unwrap();
 
         let chain = sampler.flatchain().unwrap();
@@ -1089,19 +1119,21 @@ mod tests {
         for (i, fraction) in acceptance_fraction.iter().enumerate() {
             if *fraction == 0.0f64 {
                 invalid_walkers.push(I {
-                                         idx: i,
-                                         fraction: *fraction,
-                                     });
+                    idx: i,
+                    fraction: *fraction,
+                });
             }
         }
 
         let split = acceptance_fraction.split_at(acceptance_fraction.len() / 2);
-        assert!(invalid_walkers.len() == 0,
-                "Found {} invalid walkers: {:?} (AF1: {:?}, AF2: {:?})",
-                invalid_walkers.len(),
-                invalid_walkers,
-                split.0,
-                split.1);
+        assert!(
+            invalid_walkers.len() == 0,
+            "Found {} invalid walkers: {:?} (AF1: {:?}, AF2: {:?})",
+            invalid_walkers.len(),
+            invalid_walkers,
+            split.0,
+            split.1
+        );
 
         // Check the chain
         let mut result = Guess { values: vec![0.0f64; sampler.dim] };
@@ -1113,10 +1145,12 @@ mod tests {
         }
 
         for value in result.values {
-            assert!((value / niter as f64).powf(2.0) < maxdiff,
-                    "value: {}, maxdiff: {}",
-                    value,
-                    maxdiff);
+            assert!(
+                (value / niter as f64).powf(2.0) < maxdiff,
+                "value: {}, maxdiff: {}",
+                value,
+                maxdiff
+            );
         }
     }
 
@@ -1125,30 +1159,50 @@ mod tests {
     }
 
     fn load_baked_dataset() -> (Vec<f64>, Vec<f64>) {
-        let real_x: Vec<f64> = vec![0.20584494, 0.58083612, 1.5599452, 1.5601864, 1.81824967,
-                                    1.8340451, 2.12339111, 2.9122914, 3.04242243, 3.74540119,
-                                    4.31945019, 5.24756432, 5.98658484, 6.01115012, 7.08072578,
-                                    7.31993942, 8.32442641, 8.66176146, 9.50714306, 9.69909852];
-        let observed_y: Vec<f64> = vec![4.39885877,
-                                        6.47591958,
-                                        7.21186633,
-                                        6.70806911,
-                                        10.10214811,
-                                        8.4423139,
-                                        9.31431042,
-                                        9.39983462,
-                                        10.54046213,
-                                        12.60172497,
-                                        12.4879068,
-                                        15.87082665,
-                                        16.37253099,
-                                        16.73060649,
-                                        18.55974494,
-                                        21.49215702,
-                                        21.63535559,
-                                        21.26581199,
-                                        24.83683104,
-                                        23.17735339];
+        let real_x: Vec<f64> = vec![
+            0.20584494,
+            0.58083612,
+            1.5599452,
+            1.5601864,
+            1.81824967,
+            1.8340451,
+            2.12339111,
+            2.9122914,
+            3.04242243,
+            3.74540119,
+            4.31945019,
+            5.24756432,
+            5.98658484,
+            6.01115012,
+            7.08072578,
+            7.31993942,
+            8.32442641,
+            8.66176146,
+            9.50714306,
+            9.69909852,
+        ];
+        let observed_y: Vec<f64> = vec![
+            4.39885877,
+            6.47591958,
+            7.21186633,
+            6.70806911,
+            10.10214811,
+            8.4423139,
+            9.31431042,
+            9.39983462,
+            10.54046213,
+            12.60172497,
+            12.4879068,
+            15.87082665,
+            16.37253099,
+            16.73060649,
+            18.55974494,
+            21.49215702,
+            21.63535559,
+            21.26581199,
+            24.83683104,
+            23.17735339,
+        ];
         (real_x, observed_y)
     }
 
@@ -1175,7 +1229,7 @@ mod tests {
 
         for i in 0..5 {
             out[i] = v[0] * m[i][0] + v[1] * m[i][1] + v[2] * m[i][2] + v[3] * m[i][3] +
-                     v[4] * m[i][4];
+                v[4] * m[i][4];
         }
 
         out
@@ -1192,11 +1246,13 @@ mod tests {
     #[test]
     fn test_mat_vec_mul() {
         let v = [1.0f64, 2.0f64, 3.0f64, 4.0f64, 5.0f64];
-        let mat = [[1.0f64, 0.0f64, 0.0f64, 5.0f64, 0.0f64],
-                   [0.0f64, 1.0f64, 0.0f64, 0.0f64, 0.0f64],
-                   [0.0f64, 0.0f64, 1.0f64, 0.0f64, 0.0f64],
-                   [0.0f64, 0.0f64, 0.0f64, 1.0f64, 0.0f64],
-                   [0.0f64, 0.0f64, 0.0f64, 0.0f64, 1.0f64]];
+        let mat = [
+            [1.0f64, 0.0f64, 0.0f64, 5.0f64, 0.0f64],
+            [0.0f64, 1.0f64, 0.0f64, 0.0f64, 0.0f64],
+            [0.0f64, 0.0f64, 1.0f64, 0.0f64, 0.0f64],
+            [0.0f64, 0.0f64, 0.0f64, 1.0f64, 0.0f64],
+            [0.0f64, 0.0f64, 0.0f64, 0.0f64, 1.0f64],
+        ];
         let result = mat_vec_mul(&mat, &v);
         assert_eq!(result, [21.0f64, 2.0f64, 3.0f64, 4.0f64, 5.0f64]);
     }

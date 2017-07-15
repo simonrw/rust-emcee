@@ -169,10 +169,12 @@ fn main() {
 }
 
 fn print_marginalised(name: &str, values: &[f64], truth: f64) {
-    println!("{:3} = {:6.3} +{:.3} -{:.3} (truth: {:6.3})",
-             name,
-             values[1],
-             values[1] - values[0],
-             values[2] - values[1],
-             truth);
+    println!(
+        "{:3} = {:6.3} +{:.3} -{:.3} (truth: {:6.3})",
+        name,
+        values[1],
+        values[1] - values[0],
+        values[2] - values[1],
+        truth
+    );
 }
