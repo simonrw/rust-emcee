@@ -1,5 +1,6 @@
 # emcee
 
+[![Join the chat at https://gitter.im/rust-emcee/Lobby](https://badges.gitter.im/rust-emcee/Lobby.svg)](https://gitter.im/rust-emcee/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Build Status](https://travis-ci.org/mindriot101/rust-emcee.svg?branch=master)](https://travis-ci.org/mindriot101/rust-emcee)
 [![Crates version](https://img.shields.io/crates/v/emcee.svg)](https://crates.io/crates/emcee)
 [![Docs](https://img.shields.io/badge/docs-emcee-brightgreen.svg)](https://docs.rs/emcee)
