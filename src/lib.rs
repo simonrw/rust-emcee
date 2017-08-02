@@ -142,7 +142,7 @@
 //!     y: &initial_y,
 //! };
 //!
-//! let sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
 //!     .expect("could not create sampler");
 //! ```
 //!
