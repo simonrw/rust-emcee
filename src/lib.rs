@@ -320,6 +320,7 @@
 //! [emcee-sample]: struct.EnsembleSampler.html#method.sample
 //! [emcee-step]: struct.Step.html
 
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 extern crate rand;
