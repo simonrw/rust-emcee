@@ -9,8 +9,8 @@ extern crate rand;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use rand::distributions::{Range, Normal, IndependentSample};
-use rand::{StdRng, SeedableRng};
+use rand::distributions::{IndependentSample, Normal, Range};
+use rand::{SeedableRng, StdRng};
 
 use emcee::{Guess, Prob};
 
@@ -46,7 +46,6 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f64; 3]> {
 }
 
 fn main() {
-
     /* Pre-generate rng and distributions */
     let mut rng = StdRng::from_seed(&[42]);
     let unit_range = Range::new(0f64, 1f64);
@@ -112,7 +111,6 @@ fn main() {
                 result += (self.y[i] - model).powf(2.) * inv_sigma2 - inv_sigma2.ln();
             }
             -0.5 * result
-
         }
 
         fn lnprior(&self, theta: &Guess) -> f64 {

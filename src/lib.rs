@@ -336,8 +336,8 @@ mod stretch;
 mod stores;
 
 use std::rc::Rc;
-use rand::{StdRng, Rng, SeedableRng};
-use rand::distributions::{Range, IndependentSample};
+use rand::{Rng, SeedableRng, StdRng};
+use rand::distributions::{IndependentSample, Range};
 
 use errors::*;
 pub use guess::Guess;
@@ -454,7 +454,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     where
         F: FnMut(Step),
     {
-
         let mut p = match self.initial_state {
             None => Rc::new(params.to_vec()),
             Some(ref state) => state.pos.clone(),
@@ -479,7 +478,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         self.naccepted.resize(self.nwalkers, 0);
 
         for iteration in 0..iterations {
-
             for ensemble_idx in 0..2 {
                 let (first, second) = if ensemble_idx == 0 {
                     Rc::make_mut(&mut p).split_at_mut(halfk)
@@ -523,13 +521,13 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             if iteration % self.thin == 0 {
                 let iteration = iteration / self.thin;
                 for (walker_idx, p_value) in p.iter().enumerate() {
-                    self.chain.as_mut().map(|chain| {
-                        chain.set_params(walker_idx, iteration, &p_value.values)
-                    });
+                    self.chain
+                        .as_mut()
+                        .map(|chain| chain.set_params(walker_idx, iteration, &p_value.values));
 
-                    self.probstore.as_mut().map(|store| {
-                        store.set_probs(iteration, &lnprob)
-                    });
+                    self.probstore
+                        .as_mut()
+                        .map(|store| store.set_probs(iteration, &lnprob));
                 }
             }
 
@@ -560,7 +558,6 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     pub fn run_mcmc(&mut self, p0: &[Guess], niterations: usize) -> Result<Step> {
         self.sample(p0, niterations, |_step| {})
     }
-
 
     /// Set the initial state of the sampler
     pub fn set_initial_state(&mut self, state0: Step) -> &mut Self {
@@ -605,8 +602,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let mut q = Vec::with_capacity(ns);
         let mut all_zz = Vec::with_capacity(ns);
         for sval in s {
-            let zz = ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) +
-                          1.0f64)
+            let zz = ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) + 1.0f64)
                 .powf(2.0f64) / self.proposal_scale;
             let rint = rint_range.ind_sample(&mut self.rng);
 
@@ -697,7 +693,6 @@ mod tests {
         }
     }
 
-
     struct MultivariateProb<'a> {
         icov: &'a [[f64; 5]; 5],
     }
@@ -720,7 +715,6 @@ mod tests {
             -vec_vec_mul(&values, &inv_prod) / 2.0
         }
     }
-
 
     #[test]
     fn test_single_sample() {
@@ -778,7 +772,6 @@ mod tests {
         let niters = 100;
         let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
 
-
         let params = p0.create_initial_guess(nwalkers);
         let lnprob0: Vec<_> = params.iter().map(|val| foo.lnprob(val)).collect();
 
@@ -803,7 +796,6 @@ mod tests {
         let nwalkers = 10;
         let niters = 100;
         let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo).unwrap();
-
 
         let params = p0.create_initial_guess(nwalkers);
 
@@ -839,10 +831,18 @@ mod tests {
          */
         let (real_x, observed_y) = load_baked_dataset();
         let mut pos = Vec::new();
-        pos.push(Guess { values: vec![2.08863595e-06, 2.08863595e-06] });
-        pos.push(Guess { values: vec![-1.95967012e-05, -1.95967012e-05] });
-        pos.push(Guess { values: vec![-1.32818605e-05, -1.32818605e-05] });
-        pos.push(Guess { values: vec![1.96861236e-06, 1.96861236e-06] });
+        pos.push(Guess {
+            values: vec![2.08863595e-06, 2.08863595e-06],
+        });
+        pos.push(Guess {
+            values: vec![-1.95967012e-05, -1.95967012e-05],
+        });
+        pos.push(Guess {
+            values: vec![-1.32818605e-05, -1.32818605e-05],
+        });
+        pos.push(Guess {
+            values: vec![1.96861236e-06, 1.96861236e-06],
+        });
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let nwalkers = 8;
@@ -867,7 +867,9 @@ mod tests {
     #[test]
     fn test_propose_stretch() {
         let nwalkers = 100;
-        let p0 = Guess { values: vec![2.0f64, 5.0f64] };
+        let p0 = Guess {
+            values: vec![2.0f64, 5.0f64],
+        };
 
         let pos = p0.create_initial_guess(nwalkers);
         let (real_x, observed_y) = load_baked_dataset();
@@ -886,7 +888,9 @@ mod tests {
     #[test]
     fn test_mcmc_run() {
         let nwalkers = 20;
-        let p0 = Guess { values: vec![0f64, 0f64] };
+        let p0 = Guess {
+            values: vec![0f64, 0f64],
+        };
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
@@ -985,7 +989,9 @@ mod tests {
     #[test]
     fn test_not_storing_chain() {
         let nwalkers = 20;
-        let p0 = Guess { values: vec![0f64, 0f64] };
+        let p0 = Guess {
+            values: vec![0f64, 0f64],
+        };
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
@@ -1002,7 +1008,9 @@ mod tests {
     #[test]
     fn test_thinning() {
         let nwalkers = 20;
-        let p0 = Guess { values: vec![0f64, 0f64] };
+        let p0 = Guess {
+            values: vec![0f64, 0f64],
+        };
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
@@ -1067,12 +1075,10 @@ mod tests {
         let norm_range = Normal::new(0.0f64, 1.0f64);
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let p0: Vec<_> = (0..nwalkers)
-            .map(|_| {
-                Guess {
-                    values: (0..ndim)
-                        .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
-                        .collect(),
-                }
+            .map(|_| Guess {
+                values: (0..ndim)
+                    .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
+                    .collect(),
             })
             .collect();
 
@@ -1125,7 +1131,9 @@ mod tests {
         );
 
         // Check the chain
-        let mut result = Guess { values: vec![0.0f64; sampler.dim] };
+        let mut result = Guess {
+            values: vec![0.0f64; sampler.dim],
+        };
 
         for i in 0..sampler.nwalkers * niter {
             for j in 0..sampler.dim {
@@ -1144,31 +1152,16 @@ mod tests {
     }
 
     fn create_guess() -> Guess {
-        Guess { values: vec![0.0f64, 0.0f64] }
+        Guess {
+            values: vec![0.0f64, 0.0f64],
+        }
     }
 
     fn load_baked_dataset() -> (Vec<f64>, Vec<f64>) {
         let real_x: Vec<f64> = vec![
-            0.20584494,
-            0.58083612,
-            1.5599452,
-            1.5601864,
-            1.81824967,
-            1.8340451,
-            2.12339111,
-            2.9122914,
-            3.04242243,
-            3.74540119,
-            4.31945019,
-            5.24756432,
-            5.98658484,
-            6.01115012,
-            7.08072578,
-            7.31993942,
-            8.32442641,
-            8.66176146,
-            9.50714306,
-            9.69909852,
+            0.20584494, 0.58083612, 1.5599452, 1.5601864, 1.81824967, 1.8340451, 2.12339111,
+            2.9122914, 3.04242243, 3.74540119, 4.31945019, 5.24756432, 5.98658484, 6.01115012,
+            7.08072578, 7.31993942, 8.32442641, 8.66176146, 9.50714306, 9.69909852,
         ];
         let observed_y: Vec<f64> = vec![
             4.39885877,
@@ -1217,8 +1210,8 @@ mod tests {
         let mut out = [0.0f64; 5];
 
         for i in 0..5 {
-            out[i] = v[0] * m[i][0] + v[1] * m[i][1] + v[2] * m[i][2] + v[3] * m[i][3] +
-                v[4] * m[i][4];
+            out[i] =
+                v[0] * m[i][0] + v[1] * m[i][1] + v[2] * m[i][2] + v[3] * m[i][3] + v[4] * m[i][4];
         }
 
         out

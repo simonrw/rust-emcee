@@ -17,7 +17,7 @@ version = "1.0.0-alpha.2"
 repository = "mindriot101/rust-emcee"
 
 [dependencies]
-rand = "0.3.15"
+rand = "0.4.2"
 
 [dev-dependencies]
 assert_approx_eq = "1.0.0"

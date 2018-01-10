@@ -1,5 +1,5 @@
 use rand::Rng;
-use rand::distributions::{Normal, IndependentSample};
+use rand::distributions::{IndependentSample, Normal};
 
 /// Represents an initial guess
 ///
@@ -28,7 +28,9 @@ impl ::std::ops::IndexMut<usize> for Guess {
 impl Guess {
     /// Create a guess from a slice
     pub fn new(values: &[f64]) -> Self {
-        Guess { values: Vec::from(values) }
+        Guess {
+            values: Vec::from(values),
+        }
     }
 
     /// Create a guess vector, perturbed from the starting position
@@ -90,7 +92,7 @@ impl Guess {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{StdRng, SeedableRng};
+    use rand::{SeedableRng, StdRng};
 
     #[test]
     fn test_pertubation() {

@@ -1,6 +1,5 @@
 use guess::Guess;
 
-
 #[derive(Debug, Default)]
 pub struct Stretch {
     pub q: Vec<Guess>,

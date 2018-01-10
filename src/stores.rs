@@ -53,7 +53,9 @@ impl Chain {
                 for (i, value) in buffer.iter_mut().enumerate() {
                     *value = self.get(i, walker, iter);
                 }
-                out.push(Guess { values: buffer.clone() });
+                out.push(Guess {
+                    values: buffer.clone(),
+                });
             }
         }
         out
@@ -130,7 +132,6 @@ mod test {
         assert_eq!(chain.data[2], 2.0f64);
         assert_eq!(chain.get(0, 1, 0), 2.0f64);
 
-
         let newdata = vec![5.0f64, 100.0f64];
         chain.set_params(1, 250, &newdata);
 
@@ -152,7 +153,6 @@ mod test {
         store.set(1, 0, 2.0f64);
         assert_eq!(store.data[1], 2.0f64);
         assert_eq!(store_get(&store, 1, 0), 2.0f64);
-
 
         let newdata = vec![5.0f64, 100.0f64, 1.0f64, 20f64];
         store.set_probs(250, &newdata);

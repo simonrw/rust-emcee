@@ -1,6 +1,5 @@
 use guess::Guess;
 
-
 /// Encapsulate the model evaluation
 ///
 /// The user must implement [`lnlike`](trait.Prob.html#tymethod.lnlike) and

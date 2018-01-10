@@ -1,8 +1,8 @@
 #![feature(test)]
 
-extern crate test;
 extern crate emcee;
 extern crate rand;
+extern crate test;
 
 #[cfg(test)]
 mod benchmarks {
@@ -81,12 +81,10 @@ mod benchmarks {
         let norm_range = Normal::new(0.0f64, 1.0f64);
         let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
         let p0: Vec<_> = (0..nwalkers)
-            .map(|_| {
-                Guess {
-                    values: (0..ndim)
-                        .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
-                        .collect(),
-                }
+            .map(|_| Guess {
+                values: (0..ndim)
+                    .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
+                    .collect(),
             })
             .collect();
 
@@ -101,8 +99,8 @@ mod benchmarks {
         let mut out = [0.0f64; 5];
 
         for i in 0..5 {
-            out[i] = v[0] * m[i][0] + v[1] * m[i][1] + v[2] * m[i][2] + v[3] * m[i][3] +
-                v[4] * m[i][4];
+            out[i] =
+                v[0] * m[i][0] + v[1] * m[i][1] + v[2] * m[i][2] + v[3] * m[i][3] + v[4] * m[i][4];
         }
 
         out

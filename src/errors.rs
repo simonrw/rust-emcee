@@ -32,8 +32,7 @@ impl ::std::error::Error for EmceeError {
         use EmceeError::*;
 
         let details = match *self {
-            InvalidInputs(ref msg) |
-            Msg(ref msg) => msg,
+            InvalidInputs(ref msg) | Msg(ref msg) => msg,
         };
 
         details.as_str()
