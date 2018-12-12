@@ -10,7 +10,8 @@ extern crate rand;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use rand::distributions::{Distribution, Normal, Uniform};
-use rand::{SeedableRng, StdRng};
+use rand::rngs::StdRng;
+use rand::{SeedableRng};
 
 use emcee::{Guess, Prob};
 
@@ -142,7 +143,7 @@ fn main() {
     let pos = guess.create_initial_guess_with_rng(nwalkers, &mut rng);
 
     let mut sampler =
-        emcee::EnsembleSampler::new(nwalkers, ndim, &model).expect("creating sampler");
+        emcee::EnsembleSampler::<_, StdRng>::new(nwalkers, ndim, &model).expect("creating sampler");
     sampler.seed(42);
     sampler.run_mcmc(&pos, 500).unwrap();
 
