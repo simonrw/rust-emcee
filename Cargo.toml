@@ -18,6 +18,7 @@ repository = "mindriot101/rust-emcee"
 
 [dependencies]
 rand = "^0.6.0"
+rand_pcg = "^0.1.0"
 
 [dev-dependencies]
 assert_approx_eq = "1.0.0"

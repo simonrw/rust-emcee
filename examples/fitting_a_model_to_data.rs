@@ -6,12 +6,13 @@
 
 extern crate emcee;
 extern crate rand;
+extern crate rand_pcg;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use rand::distributions::{Distribution, Normal, Uniform};
-use rand::rngs::StdRng;
-use rand::{SeedableRng};
+use rand::SeedableRng;
+use rand_pcg::Mcg128Xsl64;
 
 use emcee::{Guess, Prob};
 
@@ -48,7 +49,7 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f64; 3]> {
 
 fn main() {
     /* Pre-generate rng and distributions */
-    let mut rng = StdRng::seed_from_u64(42);
+    let mut rng = Mcg128Xsl64::seed_from_u64(42);
     let unit_range = Uniform::new(0f64, 1f64);
     let norm_gen = Normal::new(0.0, 1.0);
 
@@ -143,7 +144,7 @@ fn main() {
     let pos = guess.create_initial_guess_with_rng(nwalkers, &mut rng);
 
     let mut sampler =
-        emcee::EnsembleSampler::<_, StdRng>::new(nwalkers, ndim, &model).expect("creating sampler");
+        emcee::EnsembleSampler::<_, Mcg128Xsl64>::new(nwalkers, ndim, &model).expect("creating sampler");
     sampler.seed(42);
     sampler.run_mcmc(&pos, 500).unwrap();
 

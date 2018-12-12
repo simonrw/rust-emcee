@@ -91,15 +91,16 @@ impl Guess {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use rand::{SeedableRng};
-    use rand::rngs::{StdRng};
+    extern crate rand_pcg;
 
+    use super::*;
+    use rand::SeedableRng;
+    use self::rand_pcg::Mcg128Xsl64;
 
     #[test]
     fn test_pertubation() {
         let guess = Guess::new(&[1.0f64, 2.0f64]);
-        let mut rng = StdRng::seed_from_u64(10);
+        let mut rng = Mcg128Xsl64::seed_from_u64(0);
         let perturbed = guess.perturb_with_rng(&mut rng);
         assert!(perturbed[0] != 1.0f64);
         assert!(perturbed[1] != 2.0f64);
