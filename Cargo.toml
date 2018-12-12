@@ -21,4 +21,5 @@ rand = "^0.6.0"
 rand_pcg = "^0.1.0"
 
 [dev-dependencies]
+rand_xorshift = "^0.1.0"
 assert_approx_eq = "1.0.0"

@@ -107,6 +107,10 @@
 //! parameter vector, and your probability struct (which implements [`Prob`][emcee-prob]):
 //!
 //! ```rust
+//! # extern crate emcee;
+//! # extern crate rand;
+//! # use rand::rngs::StdRng;
+//! # use rand::SeedableRng;
 //! # use emcee::{Guess, Prob};
 //! let nwalkers = 100;
 //! let ndim = 2;  // m and c
@@ -142,13 +146,19 @@
 //!     y: &initial_y,
 //! };
 //!
-//! let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//!
+//! let rng = StdRng::seed_from_u64(0);
+//! let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model, rng)
 //!     .expect("could not create sampler");
 //! ```
 //!
 //! Then run the sampler:
 //!
 //! ```rust
+//! # extern crate emcee;
+//! # extern crate rand;
+//! # use rand::rngs::StdRng;
+//! # use rand::SeedableRng;
 //! # use emcee::{Guess, Prob};
 //! # let nwalkers = 100;
 //! # let ndim = 2;  // m and c
@@ -182,7 +192,8 @@
 //! #     y: &initial_y,
 //! # };
 //! #
-//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! # let rng = StdRng::seed_from_u64(0);
+//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model, rng)
 //! #     .expect("could not create sampler");
 //! #
 //! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
@@ -204,6 +215,10 @@
 //! example:
 //!
 //! ```rust
+//! # extern crate emcee;
+//! # extern crate rand;
+//! # use rand::rngs::StdRng;
+//! # use rand::SeedableRng;
 //! # use emcee::{Guess, Prob};
 //! # let nwalkers = 100;
 //! # let ndim = 2;  // m and c
@@ -237,7 +252,8 @@
 //! #     y: &initial_y,
 //! # };
 //! #
-//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! # let rng = StdRng::seed_from_u64(0);
+//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model, rng)
 //! #     .expect("could not create sampler");
 //! #
 //! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
@@ -256,6 +272,10 @@
 //! [`flatchain`][emcee-flatchain] method on the sampler:
 //!
 //! ```rust
+//! # extern crate emcee;
+//! # extern crate rand;
+//! # use rand::rngs::StdRng;
+//! # use rand::SeedableRng;
 //! # use emcee::{Guess, Prob};
 //! # let nwalkers = 100;
 //! # let ndim = 2;  // m and c
@@ -289,7 +309,8 @@
 //! #     y: &initial_y,
 //! # };
 //! #
-//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model)
+//! # let rng = StdRng::seed_from_u64(0);
+//! # let mut sampler = emcee::EnsembleSampler::new(nwalkers, ndim, &model, rng)
 //! #     .expect("could not create sampler");
 //! #
 //! # let initial_guess = Guess::new(&[0.0f64, 0.0f64]);
@@ -399,7 +420,7 @@ impl<'a, T: Prob + 'a, R: Rng + SeedableRng> EnsembleSampler<'a, T, R> {
     ///
     /// * the number of walkers must be even * the number of walkers must be at least twice the
     /// number of parameters
-    pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T) -> Result<Self> {
+    pub fn new(nwalkers: usize, dim: usize, lnprob: &'a T, rng: R) -> Result<Self> {
         if nwalkers % 2 != 0 {
             return Err(EmceeError::InvalidInputs(
                 "the number of walkers must be even".into(),
@@ -418,7 +439,7 @@ impl<'a, T: Prob + 'a, R: Rng + SeedableRng> EnsembleSampler<'a, T, R> {
             lnprob: lnprob,
             dim: dim,
             naccepted: vec![0; nwalkers],
-            rng: Box::new(R::seed_from_u64(0)),
+            rng: Box::new(rng),
             proposal_scale: 2.0,
             chain: None,
             probstore: None,
@@ -659,8 +680,10 @@ impl<'a, T: Prob + 'a, R: Rng + SeedableRng> EnsembleSampler<'a, T, R> {
 
 #[cfg(test)]
 mod tests {
-    use rand::rngs::{StdRng};
+    extern crate rand_pcg;
+
     use rand::distributions::{Normal, Distribution};
+    use self::rand_pcg::Mcg128Xsl64;
     use super::*;
 
     const REAL_M: f64 = 2.0f64;
@@ -724,7 +747,8 @@ mod tests {
         let p0 = create_guess();
 
         let nwalkers = 10;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, 2, &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo, rng).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.run_mcmc(&params, 1).unwrap();
@@ -738,7 +762,8 @@ mod tests {
         let p0 = create_guess();
 
         let nwalkers = 10;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, 2, &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo, rng).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
 
@@ -757,7 +782,8 @@ mod tests {
 
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, 2, &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo, rng).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
         sampler.run_mcmc(&params, niters).unwrap();
@@ -771,7 +797,8 @@ mod tests {
 
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, 2, &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo, rng).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
         let lnprob0: Vec<_> = params.iter().map(|val| foo.lnprob(val)).collect();
@@ -796,7 +823,8 @@ mod tests {
 
         let nwalkers = 10;
         let niters = 100;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, 2, &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo, rng).unwrap();
 
         let params = p0.create_initial_guess(nwalkers);
 
@@ -847,7 +875,8 @@ mod tests {
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let nwalkers = 8;
-        let sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, 2, &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, 2, &foo, rng).unwrap();
         let lnprob = sampler.get_lnprob(&pos).unwrap();
         let expected: Vec<f64> = vec![-4613.19497084, -4613.277985, -4613.25381092, -4613.1954303];
         for (a, b) in lnprob.iter().zip(expected) {
@@ -876,7 +905,8 @@ mod tests {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, p0.values.len(), &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo, rng).unwrap();
         let (a, b) = pos.split_at(nwalkers / 2);
 
         assert_eq!(a.len(), nwalkers / 2);
@@ -892,13 +922,14 @@ mod tests {
         let p0 = Guess {
             values: vec![0f64, 0f64],
         };
-        let mut rng = StdRng::seed_from_u64(10);
+        let mut rng = Mcg128Xsl64::seed_from_u64(10);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, p0.values.len(), &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo, rng).unwrap();
         sampler.seed(0);
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
 
@@ -913,7 +944,8 @@ mod tests {
     fn test_nwalkers_even() {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
-        match EnsembleSampler::<_, StdRng>::new(3, 3, &foo) {
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        match EnsembleSampler::new(3, 3, &foo, rng) {
             Err(EmceeError::InvalidInputs(msg)) => {
                 assert!(msg.contains("number of walkers must be even"));
             }
@@ -925,7 +957,8 @@ mod tests {
     fn test_enough_walkers() {
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
-        match EnsembleSampler::<_, StdRng>::new(4, 3, &foo) {
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        match EnsembleSampler::new(4, 3, &foo, rng) {
             Err(EmceeError::InvalidInputs(msg)) => {
                 assert!(msg.contains("should be more than twice"));
             }
@@ -993,13 +1026,14 @@ mod tests {
         let p0 = Guess {
             values: vec![0f64, 0f64],
         };
-        let mut rng = StdRng::seed_from_u64(10);
+        let mut rng = Mcg128Xsl64::seed_from_u64(10);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, p0.values.len(), &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo, rng).unwrap();
         sampler.seed(0);
         sampler.storechain = false;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
@@ -1012,13 +1046,14 @@ mod tests {
         let p0 = Guess {
             values: vec![0f64, 0f64],
         };
-        let mut rng = StdRng::seed_from_u64(10);
+        let mut rng = Mcg128Xsl64::seed_from_u64(10);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, p0.values.len(), &foo).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo, rng).unwrap();
         sampler.seed(0);
         sampler.thin = 500;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
@@ -1074,7 +1109,7 @@ mod tests {
         let model = MultivariateProb { icov: &icov };
 
         let norm_range = Normal::new(0.0f64, 1.0f64);
-        let mut rng = StdRng::seed_from_u64(10);
+        let mut rng = Mcg128Xsl64::seed_from_u64(10);
         let p0: Vec<_> = (0..nwalkers)
             .map(|_| Guess {
                 values: (0..ndim)
@@ -1083,14 +1118,15 @@ mod tests {
             })
             .collect();
 
-        let mut sampler = EnsembleSampler::<_, StdRng>::new(nwalkers, ndim, &model).unwrap();
+        let rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut sampler = EnsembleSampler::new(nwalkers, ndim, &model, rng).unwrap();
         sampler.seed(1);
         check_sampler(&mut sampler, niter, &p0);
     }
 
     // Test helper functions
     fn check_sampler<'a, T: Prob + 'a>(
-        sampler: &mut EnsembleSampler<'a, T, StdRng>,
+        sampler: &mut EnsembleSampler<'a, T, Mcg128Xsl64>,
         niter: usize,
         p0: &[Guess],
     ) {

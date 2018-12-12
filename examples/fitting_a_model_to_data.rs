@@ -144,7 +144,7 @@ fn main() {
     let pos = guess.create_initial_guess_with_rng(nwalkers, &mut rng);
 
     let mut sampler =
-        emcee::EnsembleSampler::<_, Mcg128Xsl64>::new(nwalkers, ndim, &model).expect("creating sampler");
+        emcee::EnsembleSampler::new(nwalkers, ndim, &model, rng).expect("creating sampler");
     sampler.seed(42);
     sampler.run_mcmc(&pos, 500).unwrap();
 
