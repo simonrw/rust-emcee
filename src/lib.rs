@@ -336,8 +336,9 @@ mod stretch;
 mod stores;
 
 use std::rc::Rc;
-use rand::{Rng, SeedableRng, StdRng};
-use rand::distributions::{IndependentSample, Range};
+use rand::SeedableRng;
+use rand::rngs::{StdRng};
+use rand::distributions::{Uniform, Distribution};
 
 use errors::*;
 pub use guess::Guess;
@@ -376,7 +377,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     dim: usize,
     proposal_scale: f64,
 
-    rng: Box<Rng>,
+    rng: Box<StdRng>,
     naccepted: Vec<usize>,
     iterations: usize,
     chain: Option<Chain>,
@@ -418,7 +419,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
             lnprob: lnprob,
             dim: dim,
             naccepted: vec![0; nwalkers],
-            rng: Box::new(rand::thread_rng()),
+            rng: Box::new(StdRng::seed_from_u64(0)),
             proposal_scale: 2.0,
             chain: None,
             probstore: None,
@@ -434,8 +435,8 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
     /// [`SeedableRng.from_seed`]
     /// (https://docs.rs/rand/0.3.15/rand/trait.SeedableRng.html#tymethod.from_seed)
     /// accepts.
-    pub fn seed(&mut self, seed: &[usize]) {
-        self.rng = Box::new(StdRng::from_seed(seed));
+    pub fn seed(&mut self, seed: u64) {
+        self.rng = Box::new(StdRng::seed_from_u64(seed));
     }
 
     /// Run the sampler with a callback called on each iteration
@@ -595,16 +596,16 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         let ns = s.len();
         let nc = c.len();
 
-        // let z_range = Range::new(1.0f64, 2.0f64);
-        let rint_range = Range::new(0usize, nc);
-        let unit_range = Range::new(0f64, 1f64);
+        // let z_range = Uniform::new(1.0f64, 2.0f64);
+        let rint_range = Uniform::new(0usize, nc);
+        let unit_range = Uniform::new(0f64, 1f64);
 
         let mut q = Vec::with_capacity(ns);
         let mut all_zz = Vec::with_capacity(ns);
         for sval in s {
-            let zz = ((self.proposal_scale - 1.0) * unit_range.ind_sample(&mut self.rng) + 1.0f64)
+            let zz = ((self.proposal_scale - 1.0) * unit_range.sample(&mut self.rng) + 1.0f64)
                 .powf(2.0f64) / self.proposal_scale;
-            let rint = rint_range.ind_sample(&mut self.rng);
+            let rint = rint_range.sample(&mut self.rng);
 
             let mut values = Vec::with_capacity(self.dim);
             for (param_i, s_param) in sval.values.iter().enumerate() {
@@ -627,7 +628,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
         for i in 0..ns {
             assert!(all_zz[i] > 0.);
             let lnpdiff = (self.dim as f64 - 1.0) * all_zz[i].ln() + out.newlnprob[i] - lnprob0[i];
-            let test_value = unit_range.ind_sample(&mut self.rng).ln();
+            let test_value = unit_range.sample(&mut self.rng).ln();
 
             if lnpdiff > test_value {
                 out.accept[i] = true;
@@ -659,7 +660,7 @@ impl<'a, T: Prob + 'a> EnsembleSampler<'a, T> {
 
 #[cfg(test)]
 mod tests {
-    use rand::distributions::Normal;
+    use rand::distributions::{Normal, Distribution};
     use super::*;
 
     const REAL_M: f64 = 2.0f64;
@@ -891,14 +892,14 @@ mod tests {
         let p0 = Guess {
             values: vec![0f64, 0f64],
         };
-        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let mut rng = StdRng::seed_from_u64(10);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
-        sampler.seed(&[0]);
+        sampler.seed(0);
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
 
         if let Some(ref chain) = sampler.chain {
@@ -992,14 +993,14 @@ mod tests {
         let p0 = Guess {
             values: vec![0f64, 0f64],
         };
-        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let mut rng = StdRng::seed_from_u64(10);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
-        sampler.seed(&[0]);
+        sampler.seed(0);
         sampler.storechain = false;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
         assert!(sampler.chain.is_none());
@@ -1011,14 +1012,14 @@ mod tests {
         let p0 = Guess {
             values: vec![0f64, 0f64],
         };
-        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let mut rng = StdRng::seed_from_u64(10);
         let pos = p0.create_initial_guess_with_rng(nwalkers, &mut rng);
         let (real_x, observed_y) = load_baked_dataset();
         let foo = LinearModel::new(&real_x, &observed_y);
 
         let niters = 1000;
         let mut sampler = EnsembleSampler::new(nwalkers, p0.values.len(), &foo).unwrap();
-        sampler.seed(&[0]);
+        sampler.seed(0);
         sampler.thin = 500;
         let _ = sampler.run_mcmc(&pos, niters).unwrap();
         match sampler.chain {
@@ -1073,17 +1074,17 @@ mod tests {
         let model = MultivariateProb { icov: &icov };
 
         let norm_range = Normal::new(0.0f64, 1.0f64);
-        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let mut rng = StdRng::seed_from_u64(10);
         let p0: Vec<_> = (0..nwalkers)
             .map(|_| Guess {
                 values: (0..ndim)
-                    .map(|_| 0.1f64 * norm_range.ind_sample(&mut rng) as f64)
+                    .map(|_| 0.1f64 * norm_range.sample(&mut rng) as f64)
                     .collect(),
             })
             .collect();
 
         let mut sampler = EnsembleSampler::new(nwalkers, ndim, &model).unwrap();
-        sampler.seed(&[1]);
+        sampler.seed(1);
         check_sampler(&mut sampler, niter, &p0);
     }
 
@@ -1192,16 +1193,16 @@ mod tests {
         use rand::distributions::Normal;
 
         let mut rng = rand::thread_rng();
-        let x_range = Range::new(0f64, 10f64);
+        let x_range = Uniform::new(0f64, 10f64);
         let norm_range = Normal::new(0.0, 3.0);
 
-        let mut real_x: Vec<f64> = (0..size).map(|_| x_range.ind_sample(&mut rng)).collect();
+        let mut real_x: Vec<f64> = (0..size).map(|_| x_range.sample(&mut rng)).collect();
         real_x.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         let real_y: Vec<f64> = real_x.iter().map(|x| REAL_M * x + REAL_C).collect();
         let observed_y: Vec<f64> = real_y
             .iter()
-            .map(|y| y + norm_range.ind_sample(&mut rng) as f64)
+            .map(|y| y + norm_range.sample(&mut rng) as f64)
             .collect();
         (real_x, observed_y)
     }

@@ -1,5 +1,5 @@
 use rand::Rng;
-use rand::distributions::{IndependentSample, Normal};
+use rand::distributions::{Distribution, Normal};
 
 /// Represents an initial guess
 ///
@@ -71,7 +71,7 @@ impl Guess {
 
         let normal = Normal::new(0.0, 1E-5);
         for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut ::rand::thread_rng()) as f64;
+            *elem += normal.sample(&mut ::rand::thread_rng()) as f64;
         }
 
         Guess { values: new_values }
@@ -82,7 +82,7 @@ impl Guess {
 
         let normal = Normal::new(0.0, 1E-5);
         for elem in &mut new_values {
-            *elem += normal.ind_sample(&mut rng) as f64;
+            *elem += normal.sample(&mut rng) as f64;
         }
 
         Guess { values: new_values }
@@ -92,12 +92,14 @@ impl Guess {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{SeedableRng, StdRng};
+    use rand::{SeedableRng};
+    use rand::rngs::{StdRng};
+
 
     #[test]
     fn test_pertubation() {
         let guess = Guess::new(&[1.0f64, 2.0f64]);
-        let mut rng = StdRng::from_seed(&[1, 2, 3, 4]);
+        let mut rng = StdRng::seed_from_u64(10);
         let perturbed = guess.perturb_with_rng(&mut rng);
         assert!(perturbed[0] != 1.0f64);
         assert!(perturbed[1] != 2.0f64);

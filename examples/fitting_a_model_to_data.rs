@@ -9,7 +9,7 @@ extern crate rand;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use rand::distributions::{IndependentSample, Normal, Range};
+use rand::distributions::{Distribution, Normal, Uniform};
 use rand::{SeedableRng, StdRng};
 
 use emcee::{Guess, Prob};
@@ -47,8 +47,8 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f64; 3]> {
 
 fn main() {
     /* Pre-generate rng and distributions */
-    let mut rng = StdRng::from_seed(&[42]);
-    let unit_range = Range::new(0f64, 1f64);
+    let mut rng = StdRng::seed_from_u64(42);
+    let unit_range = Uniform::new(0f64, 1f64);
     let norm_gen = Normal::new(0.0, 1.0);
 
     // Choose the "true" parameters.
@@ -60,7 +60,7 @@ fn main() {
     let npoints = 50usize;
     let x = {
         let mut unsorted: Vec<_> = (0..npoints)
-            .map(|_| 10f64 * unit_range.ind_sample(&mut rng))
+            .map(|_| 10f64 * unit_range.sample(&mut rng))
             .collect();
         unsorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
         unsorted
@@ -69,10 +69,10 @@ fn main() {
     let mut yerr = Vec::with_capacity(npoints);
 
     for xval in &x {
-        let yerr_val = 0.1 + 0.5 * unit_range.ind_sample(&mut rng);
+        let yerr_val = 0.1 + 0.5 * unit_range.sample(&mut rng);
         let mut y_val = m_true * xval + b_true;
-        y_val += (f_true * y_val).abs() * norm_gen.ind_sample(&mut rng) as f64;
-        y_val += yerr_val * norm_gen.ind_sample(&mut rng) as f64;
+        y_val += (f_true * y_val).abs() * norm_gen.sample(&mut rng) as f64;
+        y_val += yerr_val * norm_gen.sample(&mut rng) as f64;
 
         y.push(y_val);
         yerr.push(yerr_val);
@@ -143,7 +143,7 @@ fn main() {
 
     let mut sampler =
         emcee::EnsembleSampler::new(nwalkers, ndim, &model).expect("creating sampler");
-    sampler.seed(&[42]);
+    sampler.seed(42);
     sampler.run_mcmc(&pos, 500).unwrap();
 
     let flatchain = sampler.flatchain().unwrap();
