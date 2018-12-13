@@ -6,13 +6,13 @@
 
 extern crate emcee;
 extern crate rand;
-extern crate rand_pcg;
+extern crate rand_xorshift;
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use rand::distributions::{Distribution, Normal, Uniform};
 use rand::SeedableRng;
-use rand_pcg::Mcg128Xsl64;
+use rand_xorshift::XorShiftRng;
 
 use emcee::{Guess, Prob};
 
@@ -49,7 +49,7 @@ fn compute_quantiles(chain: &[Guess]) -> Vec<[f64; 3]> {
 
 fn main() {
     /* Pre-generate rng and distributions */
-    let mut rng = Mcg128Xsl64::seed_from_u64(42);
+    let mut rng = XorShiftRng::seed_from_u64(42);
     let unit_range = Uniform::new(0f64, 1f64);
     let norm_gen = Normal::new(0.0, 1.0);
 

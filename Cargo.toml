@@ -9,7 +9,7 @@ license = "MIT"
 name = "emcee"
 readme = "README.md"
 repository = "https://github.com/mindriot101/rust-emcee"
-version = "1.0.0-alpha.2"
+version = "2.0.0"
 
 [badges]
 
@@ -18,8 +18,7 @@ repository = "mindriot101/rust-emcee"
 
 [dependencies]
 rand = "^0.6.0"
-rand_pcg = "^0.1.0"
 
 [dev-dependencies]
+approx = "^0.3.1"
 rand_xorshift = "^0.1.0"
-assert_approx_eq = "1.0.0"

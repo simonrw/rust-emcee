@@ -91,16 +91,16 @@ impl Guess {
 
 #[cfg(test)]
 mod tests {
-    extern crate rand_pcg;
+    extern crate rand_xorshift;
 
     use super::*;
     use rand::SeedableRng;
-    use self::rand_pcg::Mcg128Xsl64;
+    use self::rand_xorshift::XorShiftRng;
 
     #[test]
     fn test_pertubation() {
         let guess = Guess::new(&[1.0f64, 2.0f64]);
-        let mut rng = Mcg128Xsl64::seed_from_u64(0);
+        let mut rng = XorShiftRng::seed_from_u64(0);
         let perturbed = guess.perturb_with_rng(&mut rng);
         assert!(perturbed[0] != 1.0f64);
         assert!(perturbed[1] != 2.0f64);
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_indexing() {
         let mut guess = Guess::new(&[1., 2., 3., 4.]);
-        assert_approx_eq!(guess[1], 2.0);
+            abs_diff_eq!(guess[1], 2.0, epsilon=1E-6);
 
         guess[2] = 15.0;
         assert_eq!(guess[2], 15.0);
