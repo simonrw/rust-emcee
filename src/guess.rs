@@ -3,7 +3,7 @@ use rand::distributions::{IndependentSample, Normal};
 
 /// Represents an initial guess
 ///
-/// This is the starting position for the sampling. All values are 32-bit floating point
+/// This is the starting position for the sampling. All values are 64-bit floating point
 /// numbers, and are contained in a [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html).
 #[derive(Debug, Clone)]
 pub struct Guess {
