@@ -383,7 +383,7 @@ pub struct EnsembleSampler<'a, T: Prob + 'a> {
     probstore: Option<ProbStore>,
     initial_state: Option<Step>,
 
-    /// Whether the sampler stores the chain; can be disabled in order to run large models  (default true)
+    /// Determines whether the sampler stores the chain; can be disabled in order to run large models (default true)
     pub storechain: bool,
 
     /// Thin the stored chains by this much, i.e. only every `thin`th step is stored (default 1)
